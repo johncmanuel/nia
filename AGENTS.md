@@ -16,6 +16,7 @@ cargo test
     - Prefer focused, well-maintained crates.
     - Avoid large dependencies for trivial functionality.
     - Do not introduce new frameworks or architectural layers without a concrete need.
+- Since using the iced library for Rust GUI development, use iced_test to test and refine changes. 
 
 ## Iterating changes
 
@@ -24,3 +25,8 @@ cargo test
 - Add or update tests for logic-heavy behavior.
 - Run formatting, checks, linting, and tests.
 - Do not opportunistically refactor unrelated code.
+
+## Project management
+
+- Persist current tasks and features to do in TODO.md
+- Delete a task or feature once finished and verified.

@@ -1,5 +1,6 @@
 use crate::app::{App, EDITOR, Message, OUTLINE, RECENT, Tab};
 use crate::markdown::{self, MarkdownHighlighter};
+use crate::ui::reading::reading_view;
 use iced::widget::{button, column, container, row, scrollable, text, text_editor, text_input};
 use iced::{Background, Border, Element, Length};
 
@@ -13,14 +14,18 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         .highlight_with::<MarkdownHighlighter>(state.editor_font, markdown::format)
         .placeholder("# Start writing")
         .font(state.editor_font)
-        .size(20)
+        .size(u32::from(state.editor_font_size))
         .line_height(text::LineHeight::Relative(1.55))
         .wrapping(text::Wrapping::Word)
         .padding(0)
         .height(Length::Fill)
         .style(|theme, status| {
             let mut style = text_editor::default(theme, status);
-            style.background = Background::Color(theme.palette().background);
+            let mut background = theme.palette().background;
+            if state.transparent_background {
+                background.a = 0.0;
+            }
+            style.background = Background::Color(background);
             style.border = Border::default();
             style.placeholder = theme.palette().text.scale_alpha(0.45);
             style.value = theme.palette().text;
@@ -38,10 +43,15 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         editor = editor.on_action(move |action| Message::Edit(tab.id, action));
     }
 
-    let writing_area = container(editor)
-        .width(Length::Fill)
-        .max_width(760)
-        .height(Length::Fill);
+    let writing_area: Element<'_, Message> = if tab.reading.is_some() {
+        reading_view(state, tab)
+    } else {
+        container(editor)
+            .width(Length::Fill)
+            .max_width(760)
+            .height(Length::Fill)
+            .into()
+    };
     let mut content = column![]
         .spacing(12)
         .width(Length::Fill)

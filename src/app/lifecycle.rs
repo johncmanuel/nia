@@ -52,7 +52,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     } else {
                         state.push_tab(document);
                     }
-                    state.show_keybindings = false;
+                    state.show_settings = false;
                     state.clear_search();
                     state.notice = None;
                     if let Some(path) = state.current().document.path.clone() {
@@ -178,6 +178,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     } else {
                         tab.document.reload(contents);
                         tab.editor = text_editor::Content::with_text(&tab.document.contents);
+                        tab.refresh_reading();
                         tab.conflict = false;
                         if state.show_search && state.search_all_tabs {
                             state.refresh_tab_search();

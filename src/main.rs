@@ -35,6 +35,7 @@ fn main() -> iced::Result {
     iced::daemon(desktop::boot, desktop::update, desktop::view)
         .default_font(iced::Font::MONOSPACE)
         .theme(desktop::theme)
+        .style(desktop::style)
         .title(desktop::title)
         .subscription(desktop::subscription)
         .run()

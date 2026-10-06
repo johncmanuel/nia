@@ -95,7 +95,7 @@ fn opened_markdown_renders_and_survives_edit_save_reopen() -> std::io::Result<()
     if let Ok(preview) = std::env::var("NIA_OPENED_SNAPSHOT") {
         let mut ui = simulator(crate::ui::view(&app));
         let _ = ui
-            .snapshot(&app.theme.iced())
+            .snapshot(&app.theme)
             .expect("render opened Markdown")
             .matches_image(preview)
             .expect("write opened preview");

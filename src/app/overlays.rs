@@ -2,23 +2,43 @@ use super::{App, EDITOR, Message, OUTLINE, RECENT, SEARCH, open_document, update
 use crate::keybindings::{Keybindings, Shortcut};
 use iced::Task;
 use iced::keyboard::{Key, key::Named};
+use iced::theme::Base;
 use iced::widget::{operation, text_editor};
 
 pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
     match message {
-        Message::ShowKeybindings => {
+        Message::ShowSettings => {
             state.show_layout = false;
-            state.show_font_picker = false;
-            state.show_keybindings = true;
+            state.show_settings = true;
+            state.show_theme_picker = false;
             state.recording = None;
             state.clear_search();
             state.notice = None;
         }
         Message::ShowEditor => {
-            state.show_keybindings = false;
+            state.show_settings = false;
+            state.show_theme_picker = false;
+            state.current_mut().reading = None;
             state.recording = None;
             state.notice = None;
             return operation::focus(EDITOR);
+        }
+        Message::ToggleReading => {
+            state.show_settings = false;
+            if state.current().reading.is_some() {
+                state.current_mut().reading = None;
+                return operation::focus(EDITOR);
+            }
+            state.show_layout = false;
+            state.clear_search();
+            state.current_mut().sync_document();
+            let content =
+                iced::widget::markdown::Content::parse(&state.current().document.contents);
+            state.current_mut().reading = Some(content);
+        }
+        Message::CopyLink(url) => {
+            state.notice = Some("Link copied".into());
+            return iced::clipboard::write(url);
         }
         Message::RecordShortcut(slot) => {
             state.recording = Some(slot);
@@ -37,32 +57,36 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::SetTheme(theme) => {
-            state.theme = theme;
-            state.notice = theme
-                .save()
+            state.show_theme_picker = false;
+            state.notice = crate::theme::save(&theme)
                 .err()
                 .map(|error| format!("Could not save theme: {error}"));
             if state.notice.is_some() {
                 log::warn!("theme save failed");
             } else {
-                log::info!("theme changed to {}", theme.label());
+                log::info!("theme changed to {}", theme.name());
             }
+            state.theme = theme;
         }
-        Message::ToggleFontPicker => {
-            state.show_font_picker = !state.show_font_picker;
-            if state.show_font_picker {
-                state.show_layout = false;
-                state.show_search = false;
-                state.show_outline = false;
-                state.show_recent = false;
-                state.show_keybindings = false;
+        Message::SetTransparentBackground(enabled) => {
+            state.notice = crate::theme::save_transparency(enabled)
+                .err()
+                .map(|error| format!("Could not save transparency setting: {error}"));
+            if state.notice.is_some() {
+                log::warn!("transparency setting save failed");
             }
+            state.transparent_background = enabled;
+        }
+        Message::ToggleThemePicker => {
+            state.show_theme_picker = !state.show_theme_picker;
+        }
+        Message::HideThemePicker => {
+            state.show_theme_picker = false;
         }
         Message::SetFont(family) => {
             if state.font_families.contains(&family) {
                 state.editor_font = crate::font::font_for(&family);
                 state.font_family = Some(family);
-                state.show_font_picker = false;
                 state.notice = crate::font::save(state.font_family.as_deref())
                     .err()
                     .map(|error| format!("Could not save font setting: {error}"));
@@ -71,15 +95,30 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         Message::ResetFont => {
             state.editor_font = iced::Font::MONOSPACE;
             state.font_family = None;
-            state.show_font_picker = false;
             state.notice = crate::font::save(None)
                 .err()
                 .map(|error| format!("Could not save font setting: {error}"));
         }
+        Message::IncreaseFontSize | Message::DecreaseFontSize => {
+            state.editor_font_size = if matches!(message, Message::IncreaseFontSize) {
+                state
+                    .editor_font_size
+                    .saturating_add(1)
+                    .min(crate::font::MAX_SIZE)
+            } else {
+                state
+                    .editor_font_size
+                    .saturating_sub(1)
+                    .max(crate::font::MIN_SIZE)
+            };
+            state.notice = crate::font::save_size(state.editor_font_size)
+                .err()
+                .map(|error| format!("Could not save font size: {error}"));
+        }
         Message::ShowSearch => {
+            state.current_mut().reading = None;
             state.show_layout = false;
-            state.show_font_picker = false;
-            state.show_keybindings = false;
+            state.show_settings = false;
             state.show_outline = false;
             state.show_recent = false;
             state.show_search = true;
@@ -89,9 +128,9 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             return operation::focus(SEARCH);
         }
         Message::ShowTabSearch => {
+            state.current_mut().reading = None;
             state.show_layout = false;
-            state.show_font_picker = false;
-            state.show_keybindings = false;
+            state.show_settings = false;
             state.show_outline = false;
             state.show_recent = false;
             state.show_search = true;
@@ -176,8 +215,8 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ShowOutline => {
-            state.show_font_picker = false;
-            state.show_keybindings = false;
+            state.current_mut().reading = None;
+            state.show_settings = false;
             state.show_search = false;
             state.show_recent = false;
             state.show_outline = true;
@@ -220,8 +259,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ShowRecent => {
-            state.show_font_picker = false;
-            state.show_keybindings = false;
+            state.show_settings = false;
             state.show_search = false;
             state.show_outline = false;
             state.show_recent = true;
@@ -300,6 +338,9 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     }
                 }
             } else if key == Key::Named(Named::Escape) {
+                if state.show_theme_picker {
+                    return update(state, Message::HideThemePicker);
+                }
                 if state.show_search {
                     return update(state, Message::HideSearch);
                 }
@@ -309,7 +350,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 if state.show_recent {
                     return update(state, Message::HideRecent);
                 }
-                if state.show_keybindings {
+                if state.show_settings {
                     return update(state, Message::ShowEditor);
                 }
             } else if state.show_outline && key == Key::Named(Named::ArrowDown) {

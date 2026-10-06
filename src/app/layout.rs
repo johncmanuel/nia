@@ -35,7 +35,7 @@ impl App {
         if let Some(tab_id) = self.panes.get_mut(self.active_pane) {
             *tab_id = id;
         }
-        self.show_keybindings = false;
+        self.show_settings = false;
         self.clear_search();
         self.notice = None;
     }

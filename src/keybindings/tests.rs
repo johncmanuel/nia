@@ -1,6 +1,66 @@
 use super::*;
 
 #[test]
+fn settings_shortcut_round_trips_and_is_added_to_old_settings() {
+    let defaults = Keybindings::default();
+    let modifiers = if cfg!(target_os = "macos") {
+        Modifiers::COMMAND
+    } else {
+        Modifiers::CTRL
+    };
+    assert_eq!(
+        defaults.matching(&Key::Character(",".into()), modifiers),
+        Some(Slot::Settings)
+    );
+    assert_eq!(
+        defaults.get(Slot::Settings).map(Shortcut::label),
+        Some(if cfg!(target_os = "macos") {
+            "Cmd+,".into()
+        } else {
+            "Ctrl+,".into()
+        })
+    );
+    assert_eq!(
+        Keybindings::decode(&defaults.encode()),
+        Some(defaults.clone())
+    );
+
+    let old = defaults
+        .encode()
+        .lines()
+        .take(Slot::ALL.len() - 1)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let restored = Keybindings::decode(&old).expect("previous keybindings file");
+    assert_eq!(restored.get(Slot::Settings), defaults.get(Slot::Settings));
+}
+
+#[test]
+fn increase_font_size_uses_command_plus_without_extra_shift() {
+    let defaults = Keybindings::default();
+    let shortcut = defaults
+        .get(Slot::IncreaseFontSize)
+        .expect("default font shortcut");
+    assert_eq!(
+        shortcut.label(),
+        if cfg!(target_os = "macos") {
+            "Cmd++"
+        } else {
+            "Super++"
+        }
+    );
+    for modifiers in [Modifiers::COMMAND, Modifiers::COMMAND | Modifiers::SHIFT] {
+        assert_eq!(
+            defaults.matching(&Key::Character("+".into()), modifiers),
+            Some(Slot::IncreaseFontSize)
+        );
+    }
+    let prior = defaults.encode().replace("meta+plus", "meta+shift+plus");
+    let restored = Keybindings::decode(&prior).expect("previous font shortcut setting");
+    assert_eq!(restored.get(Slot::IncreaseFontSize), Some(shortcut));
+}
+
+#[test]
 fn defaults_include_control_s_on_macos_and_round_trip() {
     let defaults = Keybindings::default();
     assert_eq!(
@@ -32,6 +92,17 @@ fn defaults_include_control_s_on_macos_and_round_trip() {
             Modifiers::COMMAND | Modifiers::SHIFT
         ),
         Some(Slot::FindTabs)
+    );
+    assert_eq!(
+        defaults.matching(
+            &Key::Character("=".into()),
+            Modifiers::COMMAND | Modifiers::SHIFT
+        ),
+        Some(Slot::IncreaseFontSize)
+    );
+    assert_eq!(
+        defaults.matching(&Key::Character("-".into()), Modifiers::COMMAND),
+        Some(Slot::DecreaseFontSize)
     );
     if cfg!(target_os = "macos") {
         assert_eq!(

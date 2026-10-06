@@ -3,10 +3,10 @@ use crate::font;
 use crate::keybindings::{Keybindings, Slot};
 use crate::recent;
 use crate::recovery;
-use crate::theme::WritingTheme;
+use crate::theme;
 use iced::keyboard::{Key, Modifiers};
-use iced::widget::{combo_box, pane_grid, text_editor};
-use iced::{Font, Task, window};
+use iced::widget::{combo_box, markdown, pane_grid, text_editor};
+use iced::{Font, Task, Theme, window};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -29,6 +29,7 @@ pub(crate) struct Tab {
     pub(crate) id: u64,
     pub(crate) document: Document,
     pub(crate) editor: text_editor::Content,
+    pub(crate) reading: Option<markdown::Content>,
     pub(crate) saving: bool,
     pub(crate) checking: bool,
     pub(crate) conflict: bool,
@@ -46,6 +47,7 @@ impl Tab {
             id,
             document,
             editor,
+            reading: None,
             saving: false,
             checking: false,
             conflict: false,
@@ -70,6 +72,12 @@ impl Tab {
     fn sync_document(&mut self) {
         self.document.sync_contents(self.editor.text());
     }
+
+    fn refresh_reading(&mut self) {
+        if self.reading.is_some() {
+            self.reading = Some(markdown::Content::parse(&self.editor.text()));
+        }
+    }
 }
 
 pub(crate) struct App {
@@ -83,14 +91,16 @@ pub(crate) struct App {
     pub(crate) loading: bool,
     pub(crate) dialog_open: bool,
     pub(crate) keybindings: Keybindings,
-    pub(crate) show_keybindings: bool,
+    pub(crate) show_settings: bool,
     pub(crate) recording: Option<Slot>,
-    pub(crate) theme: WritingTheme,
+    pub(crate) theme: Theme,
+    pub(crate) transparent_background: bool,
+    pub(crate) show_theme_picker: bool,
     pub(crate) font_families: Vec<String>,
     pub(crate) font_options: combo_box::State<String>,
     pub(crate) font_family: Option<String>,
     pub(crate) editor_font: Font,
-    pub(crate) show_font_picker: bool,
+    pub(crate) editor_font_size: u16,
     pub(crate) show_search: bool,
     pub(crate) search_all_tabs: bool,
     pub(crate) search_query: String,
@@ -147,14 +157,20 @@ pub(crate) enum Message {
     PaneDragged(pane_grid::DragEvent),
     PaneResized(pane_grid::ResizeEvent),
     CloseTab(usize),
-    ShowKeybindings,
+    ShowSettings,
     ShowEditor,
+    ToggleReading,
+    CopyLink(String),
     RecordShortcut(Slot),
     ResetKeybindings,
-    SetTheme(WritingTheme),
-    ToggleFontPicker,
+    SetTheme(Theme),
+    SetTransparentBackground(bool),
+    ToggleThemePicker,
+    HideThemePicker,
     SetFont(String),
     ResetFont,
+    IncreaseFontSize,
+    DecreaseFontSize,
     ShowSearch,
     ShowTabSearch,
     HideSearch,
@@ -223,13 +239,23 @@ pub(crate) fn blank() -> App {
             )
         }
     };
-    let (theme, theme_notice) = match WritingTheme::load() {
+    let (theme, theme_notice) = match theme::load() {
         Ok(theme) => (theme, None),
         Err(error) => {
             log::warn!("theme load failed");
             (
-                WritingTheme::default(),
+                Theme::CatppuccinMocha,
                 Some(format!("Could not load theme: {error}")),
+            )
+        }
+    };
+    let (transparent_background, transparency_notice) = match theme::load_transparency() {
+        Ok(value) => (value, None),
+        Err(error) => {
+            log::warn!("transparency setting load failed");
+            (
+                false,
+                Some(format!("Could not load transparency setting: {error}")),
             )
         }
     };
@@ -250,6 +276,13 @@ pub(crate) fn blank() -> App {
     let editor_font = font_family
         .as_deref()
         .map_or(Font::MONOSPACE, font::font_for);
+    let (editor_font_size, size_notice) = match font::load_size() {
+        Ok(size) => (size, None),
+        Err(error) => (
+            font::DEFAULT_SIZE,
+            Some(format!("Could not load font size: {error}")),
+        ),
+    };
     let (panes, active_pane) = pane_grid::State::new(0);
     let state = App {
         tabs: vec![Tab::new(0, Document::new())],
@@ -258,18 +291,24 @@ pub(crate) fn blank() -> App {
         active_pane,
         show_layout: false,
         next_id: 1,
-        notice: notice.or(theme_notice).or(font_notice),
+        notice: notice
+            .or(theme_notice)
+            .or(transparency_notice)
+            .or(font_notice)
+            .or(size_notice),
         loading: false,
         dialog_open: false,
         keybindings,
-        show_keybindings: false,
+        show_settings: false,
         recording: None,
         theme,
+        transparent_background,
+        show_theme_picker: false,
         font_options: combo_box::State::new(font_families.clone()),
         font_families,
         font_family,
         editor_font,
-        show_font_picker: false,
+        editor_font_size,
         show_search: false,
         search_all_tabs: false,
         search_query: String::new(),
@@ -313,6 +352,9 @@ pub(crate) fn shortcut_message(slot: Slot) -> Message {
         Slot::SinglePane => Message::SinglePane,
         Slot::SplitRight => Message::SplitPane(pane_grid::Axis::Vertical),
         Slot::SplitDown => Message::SplitPane(pane_grid::Axis::Horizontal),
+        Slot::IncreaseFontSize => Message::IncreaseFontSize,
+        Slot::DecreaseFontSize => Message::DecreaseFontSize,
+        Slot::Settings => Message::ShowSettings,
     }
 }
 

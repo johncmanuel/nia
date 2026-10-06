@@ -21,6 +21,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             let changed = action.is_edit();
             tab.editor.perform(action);
             if changed {
+                tab.refresh_reading();
                 tab.document.mark_edited();
                 tab.last_edit = Some(Instant::now());
                 if state.show_search && state.search_all_tabs {
@@ -63,7 +64,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             }
             state.select_tab(index);
             state.show_layout = false;
-            state.show_keybindings = false;
+            state.show_settings = false;
             state.clear_search();
             state.notice = None;
             return operation::focus(EDITOR);
@@ -137,7 +138,6 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             state.show_layout = !state.show_layout;
             if state.show_layout {
                 state.show_search = false;
-                state.show_font_picker = false;
             }
         }
         Message::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {

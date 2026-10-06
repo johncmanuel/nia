@@ -1,25 +1,25 @@
 use crate::app::{App, Message, SEARCH};
-use crate::theme::WritingTheme;
 use iced::widget::{
-    button, checkbox, column, combo_box, container, pane_grid, pick_list, row, scrollable, space,
-    text, text_input,
+    button, checkbox, column, container, pane_grid, row, rule, scrollable, space, text, text_input,
 };
-use iced::{Element, Length, Theme};
+use iced::{Border, Element, Length, Theme};
 
 mod confirm;
 mod editor;
-mod keybindings;
+mod reading;
+mod settings;
+mod theme;
 
 use confirm::close_confirmation;
 use editor::editor_view;
-use keybindings::keybindings_page;
+use settings::settings_page;
 
 pub(crate) fn view(state: &App) -> Element<'_, Message> {
     if state.pending_close.is_some() {
         return close_confirmation(state);
     }
-    let writing_area: Element<'_, Message> = if state.show_keybindings {
-        keybindings_page(state)
+    let writing_area: Element<'_, Message> = if state.show_settings {
+        settings_page(state)
     } else {
         pane_grid::PaneGrid::new(&state.panes, |pane, tab_id, _| {
             let tab = state
@@ -40,7 +40,9 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
             .align_y(iced::Alignment::Center);
             let content = pane_grid::Content::new(editor_view(state, tab, active));
             if state.panes.len() > 1 {
-                content.title_bar(pane_grid::TitleBar::new(title).padding([8, 12]))
+                content
+                    .title_bar(pane_grid::TitleBar::new(title).padding([8, 12]))
+                    .style(pane_border)
             } else {
                 content
             }
@@ -82,6 +84,17 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
             .padding(0)
             .style(footer_button)
             .on_press(Message::SaveAs),
+        button(
+            text(if state.current().reading.is_some() {
+                "Write"
+            } else {
+                "Read"
+            })
+            .size(12)
+        )
+        .padding(0)
+        .style(footer_button)
+        .on_press(Message::ToggleReading),
         button(text("Find").size(12))
             .padding(0)
             .style(footer_button)
@@ -95,29 +108,22 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
             .style(footer_button)
             .on_press(Message::ShowRecent),
         button(
-            text(if state.show_keybindings {
+            text(if state.show_settings {
                 "Write"
             } else {
-                "Keybindings"
+                "Settings"
             })
             .size(12)
         )
         .padding(0)
         .style(footer_button)
-        .on_press(if state.show_keybindings {
+        .on_press(if state.show_settings {
             Message::ShowEditor
         } else {
-            Message::ShowKeybindings
+            Message::ShowSettings
         }),
-        button(text("Font").size(12))
-            .padding(0)
-            .style(footer_button)
-            .on_press(Message::ToggleFontPicker),
         text(status).size(12).style(muted_text),
         space::horizontal(),
-        pick_list(WritingTheme::ALL, Some(state.theme), Message::SetTheme)
-            .text_size(12)
-            .width(140),
         text(format!("{} words", state.current().document.word_count))
             .size(12)
             .style(muted_text),
@@ -135,19 +141,26 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
                 tab.document.file_name(),
                 if tab.document.dirty { " \u{2022}" } else { "" }
             );
+            let tabs = if index == 0 {
+                tabs
+            } else {
+                tabs.push(rule::vertical(1))
+            };
             tabs.push(
-                button(text(name).size(12))
-                    .style(if index == state.active {
-                        button::secondary
-                    } else {
-                        button::text
-                    })
-                    .on_press(Message::SelectTab(index)),
-            )
-            .push(
-                button(text("\u{00D7}").size(13))
-                    .style(button::text)
-                    .on_press(Message::CloseTab(index)),
+                row![
+                    button(text(name).size(12))
+                        .style(if index == state.active {
+                            button::secondary
+                        } else {
+                            button::text
+                        })
+                        .on_press(Message::SelectTab(index)),
+                    button(text("\u{00D7}").size(13))
+                        .style(button::text)
+                        .on_press(Message::CloseTab(index)),
+                ]
+                .spacing(6)
+                .align_y(iced::Alignment::Center),
             )
         });
     let tabs = scrollable(tabs)
@@ -217,24 +230,6 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
                     .on_press(Message::SplitPane(pane_grid::Axis::Horizontal)),
             ]
             .spacing(4),
-        );
-    }
-    if state.show_font_picker {
-        header = header.push(
-            row![
-                combo_box(
-                    &state.font_options,
-                    "Choose installed font",
-                    state.font_family.as_ref(),
-                    Message::SetFont
-                )
-                .width(220)
-                .size(12),
-                button(text("Monospace").size(12))
-                    .style(button::text)
-                    .on_press(Message::ResetFont),
-            ]
-            .spacing(6),
         );
     }
     header = header.push(
@@ -318,4 +313,12 @@ fn footer_button(theme: &Theme, status: button::Status) -> button::Style {
         _ => 0.55,
     });
     style
+}
+
+fn pane_border(theme: &Theme) -> container::Style {
+    container::Style::default().border(Border {
+        color: theme.extended_palette().background.strong.color,
+        width: 1.0,
+        ..Border::default()
+    })
 }

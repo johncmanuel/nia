@@ -1,63 +1,83 @@
 use crate::keybindings::config_dir;
 use iced::Theme;
+use iced::theme::Base;
 use std::fs;
 use std::io::{self, ErrorKind};
+use std::path::Path;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum WritingTheme {
-    #[default]
-    Catppuccin,
-    TokyoNight,
-    Nord,
-    Gruvbox,
+pub(crate) fn choices(dark: bool) -> impl Iterator<Item = &'static Theme> {
+    Theme::ALL
+        .iter()
+        .filter(move |theme| theme.extended_palette().is_dark == dark)
 }
 
-impl WritingTheme {
-    pub(crate) const ALL: [Self; 4] = [
-        Self::Catppuccin,
-        Self::TokyoNight,
-        Self::Nord,
-        Self::Gruvbox,
-    ];
+pub(crate) fn load() -> io::Result<Theme> {
+    load_from(&config_dir()?.join("theme.conf"))
+}
 
-    pub(crate) fn iced(self) -> Theme {
-        match self {
-            Self::Catppuccin => Theme::CatppuccinMocha,
-            Self::TokyoNight => Theme::TokyoNight,
-            Self::Nord => Theme::Nord,
-            Self::Gruvbox => Theme::GruvboxDark,
+fn load_from(path: &Path) -> io::Result<Theme> {
+    match fs::read_to_string(path) {
+        Ok(value) => {
+            let name = value.trim();
+            // Keep settings written by the original four-theme picker working.
+            let name = match name {
+                "Catppuccin" => "Catppuccin Mocha",
+                "Gruvbox" => "Gruvbox Dark",
+                _ => name,
+            };
+            Theme::ALL
+                .iter()
+                .find(|theme| theme.name() == name)
+                .cloned()
+                .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "invalid theme setting"))
         }
-    }
-
-    pub(crate) fn label(self) -> &'static str {
-        match self {
-            Self::Catppuccin => "Catppuccin",
-            Self::TokyoNight => "Tokyo Night",
-            Self::Nord => "Nord",
-            Self::Gruvbox => "Gruvbox",
-        }
-    }
-
-    pub(crate) fn load() -> io::Result<Self> {
-        match fs::read_to_string(config_dir()?.join("theme.conf")) {
-            Ok(value) => Self::ALL
-                .into_iter()
-                .find(|theme| theme.label() == value.trim())
-                .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "invalid theme setting")),
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(error),
-        }
-    }
-
-    pub(crate) fn save(self) -> io::Result<()> {
-        let directory = config_dir()?;
-        fs::create_dir_all(&directory)?;
-        fs::write(directory.join("theme.conf"), self.label())
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(Theme::CatppuccinMocha),
+        Err(error) => Err(error),
     }
 }
 
-impl std::fmt::Display for WritingTheme {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.label())
+pub(crate) fn save(theme: &Theme) -> io::Result<()> {
+    save_to(&config_dir()?.join("theme.conf"), theme)
+}
+
+pub(crate) fn load_transparency() -> io::Result<bool> {
+    load_transparency_from(&config_dir()?.join("transparent.conf"))
+}
+
+fn load_transparency_from(path: &Path) -> io::Result<bool> {
+    match fs::read_to_string(path) {
+        Ok(value) => match value.trim() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "invalid transparency setting",
+            )),
+        },
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
     }
 }
+
+pub(crate) fn save_transparency(enabled: bool) -> io::Result<()> {
+    save_transparency_to(&config_dir()?.join("transparent.conf"), enabled)
+}
+
+fn save_transparency_to(path: &Path, enabled: bool) -> io::Result<()> {
+    let directory = path
+        .parent()
+        .ok_or_else(|| io::Error::new(ErrorKind::InvalidInput, "invalid transparency path"))?;
+    fs::create_dir_all(directory)?;
+    fs::write(path, enabled.to_string())
+}
+
+fn save_to(path: &Path, theme: &Theme) -> io::Result<()> {
+    let directory = path
+        .parent()
+        .ok_or_else(|| io::Error::new(ErrorKind::InvalidInput, "invalid theme path"))?;
+    fs::create_dir_all(directory)?;
+    fs::write(path, theme.name())
+}
+
+#[cfg(test)]
+mod tests;

@@ -19,3 +19,17 @@ fn one_captured_escape_closes_focused_search() {
     }
     assert!(!app.show_search);
 }
+
+#[test]
+fn window_style_uses_saved_transparency_choice() {
+    let mut desktop = Desktop {
+        editor: app::blank(),
+        window: window::Id::unique(),
+        startup: None,
+    };
+    let opaque = style(&desktop, &Theme::Dark);
+    assert_eq!(opaque.background_color.a, 1.0);
+    desktop.editor.transparent_background = true;
+    let transparent = style(&desktop, &Theme::Dark);
+    assert!(transparent.background_color.a < 1.0);
+}

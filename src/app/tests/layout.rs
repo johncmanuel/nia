@@ -15,6 +15,16 @@ fn layout_control_splits_without_permanent_buttons() {
         let _ = update(&mut app, message);
     }
     assert_eq!(app.panes.len(), 2);
+    if let Ok(path) = std::env::var("NIA_LAYOUT_SNAPSHOT") {
+        if std::env::var("NIA_LAYOUT_SNAPSHOT_THEME").as_deref() == Ok("light") {
+            app.theme = iced::Theme::Light;
+        }
+        simulator(crate::ui::view(&app))
+            .snapshot(&app.theme)
+            .expect("render split layout")
+            .matches_image(path)
+            .expect("write layout preview");
+    }
 }
 
 #[test]

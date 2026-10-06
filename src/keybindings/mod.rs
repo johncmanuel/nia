@@ -23,10 +23,13 @@ pub(crate) enum Slot {
     SplitRight,
     SplitDown,
     FindTabs,
+    IncreaseFontSize,
+    DecreaseFontSize,
+    Settings,
 }
 
 impl Slot {
-    pub(crate) const ALL: [Self; 16] = [
+    pub(crate) const ALL: [Self; 19] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -43,6 +46,9 @@ impl Slot {
         Self::SplitRight,
         Self::SplitDown,
         Self::FindTabs,
+        Self::IncreaseFontSize,
+        Self::DecreaseFontSize,
+        Self::Settings,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -63,6 +69,9 @@ impl Slot {
             Self::SplitRight => "Split right",
             Self::SplitDown => "Split down",
             Self::FindTabs => "Find in open tabs",
+            Self::IncreaseFontSize => "Increase editor font size",
+            Self::DecreaseFontSize => "Decrease editor font size",
+            Self::Settings => "Open settings",
         }
     }
 }
@@ -71,6 +80,8 @@ impl Slot {
 enum ShortcutKey {
     Character(char),
     Tab,
+    Plus,
+    Minus,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,14 +93,22 @@ pub(crate) struct Shortcut {
 impl Shortcut {
     fn new(key: char, modifiers: Modifiers) -> Option<Self> {
         let key = key.to_ascii_lowercase();
-        if !key.is_ascii_alphanumeric()
+        if !key.is_ascii_alphanumeric() && !matches!(key, '+' | '-' | '=' | ',')
             || !modifiers.intersects(Modifiers::CTRL | Modifiers::LOGO)
             || modifiers.alt()
         {
             return None;
         }
+        let mut modifiers = modifiers;
+        if key == '+' || key == '=' {
+            modifiers.remove(Modifiers::SHIFT);
+        }
         Some(Self {
-            key: ShortcutKey::Character(key),
+            key: match key {
+                '+' | '=' => ShortcutKey::Plus,
+                '-' => ShortcutKey::Minus,
+                _ => ShortcutKey::Character(key),
+            },
             modifiers,
         })
     }
@@ -136,6 +155,8 @@ impl Shortcut {
         match self.key {
             ShortcutKey::Character(key) => label.push(key.to_ascii_uppercase()),
             ShortcutKey::Tab => label.push_str("Tab"),
+            ShortcutKey::Plus => label.push('+'),
+            ShortcutKey::Minus => label.push('-'),
         }
         label
     }
@@ -154,6 +175,8 @@ impl Shortcut {
         match self.key {
             ShortcutKey::Character(key) => value.push(key),
             ShortcutKey::Tab => value.push_str("tab"),
+            ShortcutKey::Plus => value.push_str("plus"),
+            ShortcutKey::Minus => value.push_str("minus"),
         }
         value
     }
@@ -175,6 +198,12 @@ impl Shortcut {
         }
         if key == "tab" {
             return Self::tab(modifiers);
+        }
+        if key == "plus" {
+            return Self::new('+', modifiers);
+        }
+        if key == "minus" {
+            return Self::new('-', modifiers);
         }
         let mut characters = key.chars();
         let character = characters.next()?;
@@ -218,6 +247,16 @@ impl Default for Keybindings {
                 Shortcut::new('r', Modifiers::CTRL | Modifiers::SHIFT),
                 Shortcut::new('d', Modifiers::CTRL | Modifiers::SHIFT),
                 Shortcut::new('f', Modifiers::COMMAND | Modifiers::SHIFT),
+                Shortcut::new('+', Modifiers::COMMAND),
+                Shortcut::new('-', Modifiers::COMMAND),
+                Shortcut::new(
+                    ',',
+                    if cfg!(target_os = "macos") {
+                        Modifiers::COMMAND
+                    } else {
+                        Modifiers::CTRL
+                    },
+                ),
             ],
         }
     }

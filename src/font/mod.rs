@@ -7,6 +7,10 @@ use std::sync::OnceLock;
 
 static FAMILIES: OnceLock<Vec<String>> = OnceLock::new();
 
+pub(crate) const DEFAULT_SIZE: u16 = 20;
+pub(crate) const MIN_SIZE: u16 = 12;
+pub(crate) const MAX_SIZE: u16 = 40;
+
 fn family_names() -> &'static [String] {
     FAMILIES.get_or_init(|| {
         let mut database = fontdb::Database::new();
@@ -58,6 +62,35 @@ fn load_from(path: &Path) -> io::Result<Option<String>> {
 
 pub(crate) fn save(family: Option<&str>) -> io::Result<()> {
     save_to(&config_dir()?.join("font.conf"), family)
+}
+
+pub(crate) fn load_size() -> io::Result<u16> {
+    load_size_from(&config_dir()?.join("font-size.conf"))
+}
+
+fn load_size_from(path: &Path) -> io::Result<u16> {
+    match fs::read_to_string(path) {
+        Ok(value) => value
+            .trim()
+            .parse::<u16>()
+            .ok()
+            .filter(|size| (MIN_SIZE..=MAX_SIZE).contains(size))
+            .ok_or_else(|| io::Error::new(ErrorKind::InvalidData, "invalid font size")),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(DEFAULT_SIZE),
+        Err(error) => Err(error),
+    }
+}
+
+pub(crate) fn save_size(size: u16) -> io::Result<()> {
+    save_size_to(&config_dir()?.join("font-size.conf"), size)
+}
+
+fn save_size_to(path: &Path, size: u16) -> io::Result<()> {
+    let directory = path
+        .parent()
+        .ok_or_else(|| io::Error::new(ErrorKind::InvalidInput, "invalid font size path"))?;
+    fs::create_dir_all(directory)?;
+    fs::write(path, size.to_string())
 }
 
 fn save_to(path: &Path, family: Option<&str>) -> io::Result<()> {

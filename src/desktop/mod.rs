@@ -23,6 +23,7 @@ pub(crate) fn boot() -> (Desktop, Task<Message>) {
     let (window, opening) = window::open(window::Settings {
         size: iced::Size::new(1000.0, 760.0),
         maximized: true,
+        transparent: cfg!(any(target_os = "macos", target_os = "linux")),
         exit_on_close_request: false,
         ..Default::default()
     });
@@ -67,7 +68,15 @@ pub(crate) fn view(state: &Desktop, id: window::Id) -> Element<'_, Message> {
 }
 
 pub(crate) fn theme(state: &Desktop, _id: window::Id) -> Theme {
-    state.editor.theme.iced()
+    state.editor.theme.clone()
+}
+
+pub(crate) fn style(state: &Desktop, theme: &Theme) -> iced::theme::Style {
+    let mut style = iced::theme::default(theme);
+    if state.editor.transparent_background {
+        style.background_color.a = 0.65;
+    }
+    style
 }
 
 pub(crate) fn title(state: &Desktop, _id: window::Id) -> String {

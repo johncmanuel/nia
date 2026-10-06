@@ -17,6 +17,7 @@ cargo test
     - Avoid large dependencies for trivial functionality.
     - Do not introduce new frameworks or architectural layers without a concrete need.
 - Since using the iced library for Rust GUI development, use iced_test to test and refine changes. 
+- if *.rs files become semantically large and it's feasible to break it up for better code maintainability and readability, do so.
 
 ## Iterating changes
 

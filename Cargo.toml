@@ -3,6 +3,13 @@ name = "nia"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+debug-tools = ["iced/debug"]
+
 [dependencies]
-iced = { version = "0.14.0", features = ["smol", "debug"] }
+iced = { version = "0.14.0", default-features = false, features = ["smol", "advanced", "wgpu", "tiny-skia"] }
 rfd = "0.17.2"
+log = "0.4"
+
+[dev-dependencies]
+iced_test = "0.14.0"

@@ -22,10 +22,11 @@ pub(crate) enum Slot {
     SinglePane,
     SplitRight,
     SplitDown,
+    FindTabs,
 }
 
 impl Slot {
-    pub(crate) const ALL: [Self; 15] = [
+    pub(crate) const ALL: [Self; 16] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -41,6 +42,7 @@ impl Slot {
         Self::SinglePane,
         Self::SplitRight,
         Self::SplitDown,
+        Self::FindTabs,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -60,6 +62,7 @@ impl Slot {
             Self::SinglePane => "Single pane",
             Self::SplitRight => "Split right",
             Self::SplitDown => "Split down",
+            Self::FindTabs => "Find in open tabs",
         }
     }
 }
@@ -214,6 +217,7 @@ impl Default for Keybindings {
                 Shortcut::new('l', Modifiers::CTRL | Modifiers::SHIFT),
                 Shortcut::new('r', Modifiers::CTRL | Modifiers::SHIFT),
                 Shortcut::new('d', Modifiers::CTRL | Modifiers::SHIFT),
+                Shortcut::new('f', Modifiers::COMMAND | Modifiers::SHIFT),
             ],
         }
     }

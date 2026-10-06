@@ -8,6 +8,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::ShowKeybindings => {
             state.show_layout = false;
+            state.show_font_picker = false;
             state.show_keybindings = true;
             state.recording = None;
             state.clear_search();
@@ -47,51 +48,135 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 log::info!("theme changed to {}", theme.label());
             }
         }
+        Message::ToggleFontPicker => {
+            state.show_font_picker = !state.show_font_picker;
+            if state.show_font_picker {
+                state.show_layout = false;
+                state.show_search = false;
+                state.show_outline = false;
+                state.show_recent = false;
+                state.show_keybindings = false;
+            }
+        }
+        Message::SetFont(family) => {
+            if state.font_families.contains(&family) {
+                state.editor_font = crate::font::font_for(&family);
+                state.font_family = Some(family);
+                state.show_font_picker = false;
+                state.notice = crate::font::save(state.font_family.as_deref())
+                    .err()
+                    .map(|error| format!("Could not save font setting: {error}"));
+            }
+        }
+        Message::ResetFont => {
+            state.editor_font = iced::Font::MONOSPACE;
+            state.font_family = None;
+            state.show_font_picker = false;
+            state.notice = crate::font::save(None)
+                .err()
+                .map(|error| format!("Could not save font setting: {error}"));
+        }
         Message::ShowSearch => {
             state.show_layout = false;
+            state.show_font_picker = false;
             state.show_keybindings = false;
             state.show_outline = false;
             state.show_recent = false;
             state.show_search = true;
+            state.search_all_tabs = false;
             state.search_index = None;
             state.refresh_search();
+            return operation::focus(SEARCH);
+        }
+        Message::ShowTabSearch => {
+            state.show_layout = false;
+            state.show_font_picker = false;
+            state.show_keybindings = false;
+            state.show_outline = false;
+            state.show_recent = false;
+            state.show_search = true;
+            state.search_all_tabs = true;
+            state.search_index = None;
+            state.refresh_tab_search();
             return operation::focus(SEARCH);
         }
         Message::HideSearch => {
             state.show_search = false;
             return operation::focus(EDITOR);
         }
+        Message::SearchAllTabs(all_tabs) => {
+            state.search_all_tabs = all_tabs;
+            state.search_index = None;
+            if all_tabs {
+                state.refresh_tab_search();
+            } else {
+                state.refresh_search();
+                if !state.search_query.is_empty() {
+                    state.jump_match(0);
+                }
+            }
+        }
         Message::SearchChanged(query) => {
             state.search_query = query;
             state.search_index = None;
-            state.refresh_search();
-            if !state.search_query.is_empty() {
-                state.jump_match(0);
+            if state.search_all_tabs {
+                state.refresh_tab_search();
+            } else {
+                state.refresh_search();
+                if !state.search_query.is_empty() {
+                    state.jump_match(0);
+                }
             }
         }
         Message::SearchCaseChanged(match_case) => {
             state.search_case_sensitive = match_case;
             state.search_index = None;
-            state.refresh_search();
-            state.jump_match(0);
+            if state.search_all_tabs {
+                state.refresh_tab_search();
+            } else {
+                state.refresh_search();
+                state.jump_match(0);
+            }
         }
         Message::FindNext => {
-            let count = state.search_matches().len();
+            let count = if state.search_all_tabs {
+                state.tab_search_hits.len()
+            } else {
+                state.search_matches().len()
+            };
             if count > 0 {
-                state.jump_match(state.search_index.map_or(0, |index| (index + 1) % count));
+                let index = state.search_index.map_or(0, |index| (index + 1) % count);
+                if state.search_all_tabs {
+                    state.jump_tab_search(index);
+                } else {
+                    state.jump_match(index);
+                }
             }
         }
         Message::FindPrevious => {
-            let count = state.search_matches().len();
+            let count = if state.search_all_tabs {
+                state.tab_search_hits.len()
+            } else {
+                state.search_matches().len()
+            };
             if count > 0 {
-                state.jump_match(
-                    state
-                        .search_index
-                        .map_or(count - 1, |index| (index + count - 1) % count),
-                );
+                let index = state
+                    .search_index
+                    .map_or(count - 1, |index| (index + count - 1) % count);
+                if state.search_all_tabs {
+                    state.jump_tab_search(index);
+                } else {
+                    state.jump_match(index);
+                }
+            }
+        }
+        Message::JumpTabSearch(index) => {
+            if state.jump_tab_search(index) {
+                return operation::focus(EDITOR);
             }
         }
         Message::ShowOutline => {
+            state.show_font_picker = false;
             state.show_keybindings = false;
             state.show_search = false;
             state.show_recent = false;
@@ -135,6 +220,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ShowRecent => {
+            state.show_font_picker = false;
             state.show_keybindings = false;
             state.show_search = false;
             state.show_outline = false;

@@ -26,6 +26,13 @@ fn defaults_include_control_s_on_macos_and_round_trip() {
         defaults.matching(&Key::Character("f".into()), Modifiers::COMMAND),
         Some(Slot::Find)
     );
+    assert_eq!(
+        defaults.matching(
+            &Key::Character("f".into()),
+            Modifiers::COMMAND | Modifiers::SHIFT
+        ),
+        Some(Slot::FindTabs)
+    );
     if cfg!(target_os = "macos") {
         assert_eq!(
             defaults.matching(&Key::Character("f".into()), Modifiers::CTRL),
@@ -107,6 +114,20 @@ fn browser_tab_shortcuts_survive_old_settings_and_round_trip() {
         loaded.matching(&Key::Named(Named::Tab), Modifiers::CTRL | Modifiers::SHIFT),
         Some(Slot::PreviousTab)
     );
+}
+
+#[test]
+fn old_settings_gain_global_search_without_reassigning_existing_slots() {
+    let defaults = Keybindings::default();
+    let old = defaults
+        .encode()
+        .lines()
+        .take(15)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let loaded = Keybindings::decode(&old).expect("valid previous settings");
+    assert_eq!(loaded.get(Slot::Find), defaults.get(Slot::Find));
+    assert_eq!(loaded.get(Slot::FindTabs), defaults.get(Slot::FindTabs));
 }
 
 #[test]

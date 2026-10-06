@@ -16,24 +16,28 @@ pub(crate) enum Kind {
 }
 
 pub(crate) struct MarkdownHighlighter {
+    font: Font,
     line: usize,
     fence: Option<Fence>,
     fences_after: Vec<Option<Fence>>,
 }
 
 impl text::Highlighter for MarkdownHighlighter {
-    type Settings = ();
-    type Highlight = Kind;
-    type Iterator<'a> = std::vec::IntoIter<(Range<usize>, Kind)>;
+    type Settings = Font;
+    type Highlight = (Kind, Font);
+    type Iterator<'a> = std::vec::IntoIter<(Range<usize>, Self::Highlight)>;
 
-    fn new(_: &()) -> Self {
+    fn new(font: &Font) -> Self {
         Self {
+            font: *font,
             line: 0,
             fence: None,
             fences_after: Vec::new(),
         }
     }
-    fn update(&mut self, _: &()) {}
+    fn update(&mut self, font: &Font) {
+        self.font = *font;
+    }
     fn change_line(&mut self, line: usize) {
         self.fences_after.truncate(line);
         self.fence = line
@@ -87,7 +91,11 @@ impl text::Highlighter for MarkdownHighlighter {
             ranges.extend(inline_ranges(line, start));
         }
         self.fences_after.push(self.fence);
-        ranges.into_iter()
+        ranges
+            .into_iter()
+            .map(|(range, kind)| (range, (kind, self.font)))
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 }
 
@@ -122,7 +130,7 @@ fn inline_ranges(line: &str, mut index: usize) -> Vec<(Range<usize>, Kind)> {
     ranges
 }
 
-pub(crate) fn format(kind: &Kind, theme: &Theme) -> highlighter::Format<Font> {
+pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlighter::Format<Font> {
     let palette = theme.palette();
     let (color, weight) = match kind {
         Kind::Heading => (palette.primary, font::Weight::Bold),
@@ -136,37 +144,10 @@ pub(crate) fn format(kind: &Kind, theme: &Theme) -> highlighter::Format<Font> {
         color: Some(color),
         font: Some(Font {
             weight,
-            ..Font::MONOSPACE
+            ..*base_font
         }),
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use iced::widget::text::Highlighter;
-
-    #[test]
-    fn highlights_markdown_without_treating_fenced_headings_as_headings() {
-        let mut highlighter = MarkdownHighlighter::new(&());
-        assert_eq!(
-            highlighter.highlight_line("# Title").collect::<Vec<_>>(),
-            vec![(0..7, Kind::Heading)]
-        );
-        assert_eq!(
-            highlighter.highlight_line("```md").collect::<Vec<_>>(),
-            vec![(0..5, Kind::Code)]
-        );
-        assert_eq!(
-            highlighter.highlight_line("# source").collect::<Vec<_>>(),
-            vec![(0..8, Kind::Code)]
-        );
-        highlighter.change_line(1);
-        assert_eq!(
-            highlighter
-                .highlight_line("plain *word* [link](url)")
-                .collect::<Vec<_>>(),
-            vec![(6..12, Kind::Emphasis), (13..24, Kind::Link)]
-        );
-    }
-}
+mod tests;

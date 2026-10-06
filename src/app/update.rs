@@ -23,7 +23,11 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             if changed {
                 tab.document.mark_edited();
                 tab.last_edit = Some(Instant::now());
-                state.refresh_search();
+                if state.show_search && state.search_all_tabs {
+                    state.refresh_tab_search();
+                } else {
+                    state.refresh_search();
+                }
                 state.search_index = None;
                 state.notice = None;
             }
@@ -133,6 +137,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             state.show_layout = !state.show_layout;
             if state.show_layout {
                 state.show_search = false;
+                state.show_font_picker = false;
             }
         }
         Message::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {

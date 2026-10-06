@@ -21,9 +21,11 @@ impl App {
 
     pub(super) fn clear_search(&mut self) {
         self.show_search = false;
+        self.search_all_tabs = false;
         self.search_query.clear();
         self.search_index = None;
         self.search_hits.clear();
+        self.tab_search_hits.clear();
         self.show_outline = false;
         self.outline_query.clear();
         self.outline_index = 0;
@@ -51,9 +53,9 @@ impl App {
     pub(crate) fn title(&self) -> String {
         let document = &self.current().document;
         format!(
-            "{}{} — nia",
+            "{}{} - nia",
             document.file_name(),
-            if document.dirty { " •" } else { "" }
+            if document.dirty { " \u{2022}" } else { "" }
         )
     }
 

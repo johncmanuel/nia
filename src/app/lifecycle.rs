@@ -179,7 +179,11 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                         tab.document.reload(contents);
                         tab.editor = text_editor::Content::with_text(&tab.document.contents);
                         tab.conflict = false;
-                        state.refresh_search();
+                        if state.show_search && state.search_all_tabs {
+                            state.refresh_tab_search();
+                        } else {
+                            state.refresh_search();
+                        }
                         state.search_index = None;
                         state.notice = Some("Reloaded changes from disk.".into());
                     }

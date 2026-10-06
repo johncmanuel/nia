@@ -1,7 +1,7 @@
 use crate::app::{App, EDITOR, Message, OUTLINE, RECENT, Tab};
 use crate::markdown::{self, MarkdownHighlighter};
 use iced::widget::{button, column, container, row, scrollable, text, text_editor, text_input};
-use iced::{Background, Border, Element, Font, Length};
+use iced::{Background, Border, Element, Length};
 
 pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Element<'a, Message> {
     let mut editor = text_editor(&tab.editor)
@@ -10,9 +10,9 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         } else {
             format!("editor-{}", tab.id)
         })
-        .highlight_with::<MarkdownHighlighter>((), markdown::format)
+        .highlight_with::<MarkdownHighlighter>(state.editor_font, markdown::format)
         .placeholder("# Start writing")
-        .font(Font::MONOSPACE)
+        .font(state.editor_font)
         .size(20)
         .line_height(text::LineHeight::Relative(1.55))
         .wrapping(text::Wrapping::Word)
@@ -85,7 +85,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
                         .on_input(Message::OutlineChanged)
                         .on_submit(Message::JumpOutlineSelected)
                         .width(Length::Fill),
-                    button("×").on_press(Message::HideOutline),
+                    button("\u{00D7}").on_press(Message::HideOutline),
                 ]
                 .spacing(8),
                 scrollable(results).height(220),
@@ -115,7 +115,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
                         .on_input(Message::RecentChanged)
                         .on_submit(Message::OpenRecentSelected)
                         .width(Length::Fill),
-                    button("×").on_press(Message::HideRecent),
+                    button("\u{00D7}").on_press(Message::HideRecent),
                 ]
                 .spacing(8),
                 scrollable(results).height(220),

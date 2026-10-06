@@ -1,8 +1,8 @@
 use crate::app::{App, Message, SEARCH};
 use crate::theme::WritingTheme;
 use iced::widget::{
-    button, checkbox, column, container, pane_grid, pick_list, row, scrollable, space, text,
-    text_input,
+    button, checkbox, column, combo_box, container, pane_grid, pick_list, row, scrollable, space,
+    text, text_input,
 };
 use iced::{Element, Length, Theme};
 
@@ -29,10 +29,10 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
                 .unwrap_or_else(|| state.current());
             let active = pane == state.active_pane;
             let title = row![
-                text(if active { "●" } else { "○" }).size(12),
+                text(if active { "\u{25CF}" } else { "\u{25CB}" }).size(12),
                 text(tab.document.file_name()).size(13),
                 space::horizontal(),
-                button("×")
+                button("\u{00D7}")
                     .style(button::text)
                     .on_press(Message::ClosePane(pane)),
             ]
@@ -54,9 +54,9 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
 
     let status = state.notice.as_deref().unwrap_or_else(|| {
         if state.loading {
-            "Opening…"
+            "Opening..."
         } else if state.current().saving {
-            "Saving…"
+            "Saving..."
         } else if state.current().document.dirty {
             "Unsaved"
         } else if state.current().document.path.is_some() {
@@ -109,6 +109,10 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
         } else {
             Message::ShowKeybindings
         }),
+        button(text("Font").size(12))
+            .padding(0)
+            .style(footer_button)
+            .on_press(Message::ToggleFontPicker),
         text(status).size(12).style(muted_text),
         space::horizontal(),
         pick_list(WritingTheme::ALL, Some(state.theme), Message::SetTheme)
@@ -129,7 +133,7 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
             let name = format!(
                 "{}{}",
                 tab.document.file_name(),
-                if tab.document.dirty { " •" } else { "" }
+                if tab.document.dirty { " \u{2022}" } else { "" }
             );
             tabs.push(
                 button(text(name).size(12))
@@ -141,7 +145,7 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
                     .on_press(Message::SelectTab(index)),
             )
             .push(
-                button(text("×").size(13))
+                button(text("\u{00D7}").size(13))
                     .style(button::text)
                     .on_press(Message::CloseTab(index)),
             )
@@ -154,27 +158,44 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
         .height(36);
     let mut header = row![tabs].spacing(8).align_y(iced::Alignment::Center);
     if state.show_search {
-        let count = state.search_matches().len();
+        let count = if state.search_all_tabs {
+            state.tab_search_hits.len()
+        } else {
+            state.search_matches().len()
+        };
         let position = state.search_index.map_or(0, |index| index + 1);
         header = header.push(
             row![
-                text_input("Find in document", &state.search_query)
-                    .id(SEARCH)
-                    .on_input(Message::SearchChanged)
-                    .on_submit(Message::FindNext)
-                    .width(200),
+                text_input(
+                    if state.search_all_tabs {
+                        "Search open tabs"
+                    } else {
+                        "Find in document"
+                    },
+                    &state.search_query
+                )
+                .id(SEARCH)
+                .on_input(Message::SearchChanged)
+                .on_submit(Message::FindNext)
+                .width(200),
                 text(format!("{position}/{count}"))
                     .size(12)
                     .style(muted_text),
+                checkbox(state.search_all_tabs)
+                    .label("All tabs")
+                    .on_toggle(Message::SearchAllTabs)
+                    .text_size(12),
                 checkbox(state.search_case_sensitive)
                     .label("Case")
                     .on_toggle(Message::SearchCaseChanged)
                     .text_size(12),
-                button("↑")
+                button("\u{2191}")
                     .style(button::text)
                     .on_press(Message::FindPrevious),
-                button("↓").style(button::text).on_press(Message::FindNext),
-                button("×")
+                button("\u{2193}")
+                    .style(button::text)
+                    .on_press(Message::FindNext),
+                button("\u{00D7}")
                     .style(button::text)
                     .on_press(Message::HideSearch),
             ]
@@ -198,19 +219,90 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
             .spacing(4),
         );
     }
+    if state.show_font_picker {
+        header = header.push(
+            row![
+                combo_box(
+                    &state.font_options,
+                    "Choose installed font",
+                    state.font_family.as_ref(),
+                    Message::SetFont
+                )
+                .width(220)
+                .size(12),
+                button(text("Monospace").size(12))
+                    .style(button::text)
+                    .on_press(Message::ResetFont),
+            ]
+            .spacing(6),
+        );
+    }
     header = header.push(
         button(text("Layout").size(12))
             .style(button::text)
             .on_press(Message::ToggleLayout),
     );
-    column![
-        container(header).width(Length::Fill).padding([8, 20]),
-        writing_area,
-        container(footer).width(Length::Fill).padding([12, 20]),
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    let mut page = column![container(header).width(Length::Fill).padding([8, 20])];
+    if state.show_search && state.search_all_tabs && !state.search_query.is_empty() {
+        let mut results = column![].spacing(2);
+        let first = state.search_index.unwrap_or(0) / 100 * 100;
+        for (index, hit) in state
+            .tab_search_hits
+            .iter()
+            .enumerate()
+            .skip(first)
+            .take(100)
+        {
+            if let Some((tab_index, tab)) = state
+                .tabs
+                .iter()
+                .enumerate()
+                .find(|(_, tab)| tab.id == hit.tab_id)
+            {
+                let label = format!(
+                    "{}: {}:{}  {}",
+                    tab_index + 1,
+                    tab.document.file_name(),
+                    hit.start.line + 1,
+                    hit.preview
+                );
+                results = results.push(
+                    button(text(label).size(12))
+                        .style(if state.search_index == Some(index) {
+                            button::secondary
+                        } else {
+                            button::text
+                        })
+                        .width(Length::Fill)
+                        .on_press(Message::JumpTabSearch(index)),
+                );
+            }
+        }
+        if state.tab_search_hits.len() > 100 {
+            let last = (first + 100).min(state.tab_search_hits.len());
+            results = results.push(
+                text(format!(
+                    "Showing {}-{} of {} matches. Use arrows for more.",
+                    first + 1,
+                    last,
+                    state.tab_search_hits.len()
+                ))
+                .size(12),
+            );
+        } else if state.tab_search_hits.is_empty() {
+            results = results.push(text("No matches in open tabs.").size(12));
+        }
+        page = page.push(
+            container(scrollable(results).height(Length::Fixed(180.0)))
+                .width(Length::Fill)
+                .padding([4, 20]),
+        );
+    }
+    page.push(writing_area)
+        .push(container(footer).width(Length::Fill).padding([12, 20]))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }
 
 fn muted_text(theme: &Theme) -> text::Style {

@@ -21,7 +21,7 @@ pub(super) fn keybindings_page(state: &App) -> Element<'_, Message> {
             rows = rows.push(text("Layout").size(18));
         }
         let shortcut = if state.recording == Some(slot) {
-            "Press keys…".into()
+            "Press keys...".into()
         } else {
             state
                 .keybindings
@@ -44,9 +44,9 @@ pub(super) fn keybindings_page(state: &App) -> Element<'_, Message> {
 
     rows = rows.push(
         text(if cfg!(target_os = "macos") {
-            "Cmd+1–9 selects a tab (9 selects the last tab)."
+            "Cmd+1-9 selects a tab (9 selects the last tab)."
         } else {
-            "Ctrl+1–9 selects a tab (9 selects the last tab)."
+            "Ctrl+1-9 selects a tab (9 selects the last tab)."
         })
         .size(12)
         .style(muted_text),

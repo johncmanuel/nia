@@ -1,11 +1,12 @@
 use crate::document::Document;
+use crate::font;
 use crate::keybindings::{Keybindings, Slot};
 use crate::recent;
 use crate::recovery;
 use crate::theme::WritingTheme;
 use iced::keyboard::{Key, Modifiers};
-use iced::widget::{pane_grid, text_editor};
-use iced::{Task, window};
+use iced::widget::{combo_box, pane_grid, text_editor};
+use iced::{Font, Task, window};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -13,6 +14,7 @@ mod layout;
 mod lifecycle;
 mod overlays;
 mod save;
+mod search_tabs;
 mod state;
 mod update;
 
@@ -84,11 +86,18 @@ pub(crate) struct App {
     pub(crate) show_keybindings: bool,
     pub(crate) recording: Option<Slot>,
     pub(crate) theme: WritingTheme,
+    pub(crate) font_families: Vec<String>,
+    pub(crate) font_options: combo_box::State<String>,
+    pub(crate) font_family: Option<String>,
+    pub(crate) editor_font: Font,
+    pub(crate) show_font_picker: bool,
     pub(crate) show_search: bool,
+    pub(crate) search_all_tabs: bool,
     pub(crate) search_query: String,
     pub(crate) search_index: Option<usize>,
     pub(crate) search_case_sensitive: bool,
     search_hits: Vec<(text_editor::Position, text_editor::Position)>,
+    pub(crate) tab_search_hits: Vec<search_tabs::TabMatch>,
     pub(crate) show_outline: bool,
     pub(crate) outline_query: String,
     pub(crate) outline_index: usize,
@@ -143,12 +152,18 @@ pub(crate) enum Message {
     RecordShortcut(Slot),
     ResetKeybindings,
     SetTheme(WritingTheme),
+    ToggleFontPicker,
+    SetFont(String),
+    ResetFont,
     ShowSearch,
+    ShowTabSearch,
     HideSearch,
+    SearchAllTabs(bool),
     SearchChanged(String),
     SearchCaseChanged(bool),
     FindNext,
     FindPrevious,
+    JumpTabSearch(usize),
     ShowOutline,
     HideOutline,
     OutlineChanged(String),
@@ -225,6 +240,16 @@ pub(crate) fn blank() -> App {
             Vec::new()
         }
     };
+    let font_families = font::installed_families();
+    let (font_family, font_notice) = match font::load() {
+        Ok(Some(family)) if font_families.contains(&family) => (Some(family), None),
+        Ok(Some(_)) => (None, Some("Saved font is no longer installed.".into())),
+        Ok(None) => (None, None),
+        Err(error) => (None, Some(format!("Could not load font setting: {error}"))),
+    };
+    let editor_font = font_family
+        .as_deref()
+        .map_or(Font::MONOSPACE, font::font_for);
     let (panes, active_pane) = pane_grid::State::new(0);
     let state = App {
         tabs: vec![Tab::new(0, Document::new())],
@@ -233,18 +258,25 @@ pub(crate) fn blank() -> App {
         active_pane,
         show_layout: false,
         next_id: 1,
-        notice: notice.or(theme_notice),
+        notice: notice.or(theme_notice).or(font_notice),
         loading: false,
         dialog_open: false,
         keybindings,
         show_keybindings: false,
         recording: None,
         theme,
+        font_options: combo_box::State::new(font_families.clone()),
+        font_families,
+        font_family,
+        editor_font,
+        show_font_picker: false,
         show_search: false,
+        search_all_tabs: false,
         search_query: String::new(),
         search_index: None,
         search_case_sensitive: false,
         search_hits: Vec::new(),
+        tab_search_hits: Vec::new(),
         show_outline: false,
         outline_query: String::new(),
         outline_index: 0,
@@ -272,6 +304,7 @@ pub(crate) fn shortcut_message(slot: Slot) -> Message {
         Slot::Open => Message::Open,
         Slot::Save | Slot::AlternateSave => Message::Save,
         Slot::Find | Slot::AlternateFind => Message::ShowSearch,
+        Slot::FindTabs => Message::ShowTabSearch,
         Slot::Outline => Message::ShowOutline,
         Slot::Recent => Message::ShowRecent,
         Slot::CloseTab => Message::CloseCurrentTab,

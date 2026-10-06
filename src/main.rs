@@ -1,6 +1,7 @@
 mod app;
 mod desktop;
 mod document;
+mod font;
 mod keybindings;
 mod markdown;
 mod recent;

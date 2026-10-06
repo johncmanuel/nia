@@ -23,7 +23,7 @@ fn tab_and_find_controls_work_in_headless_ui() {
     assert_eq!(app.active, 1);
 
     let mut ui = simulator(crate::ui::view(&app));
-    ui.click("Untitled •").expect("dirty tab visible");
+    ui.click("Untitled \u{2022}").expect("dirty tab visible");
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
@@ -48,7 +48,7 @@ fn tab_and_find_controls_work_in_headless_ui() {
 
     let mut ui = simulator(crate::ui::view(&app));
     assert!(ui.find("1/2").is_ok());
-    ui.click("↓").expect("next match button visible");
+    ui.click("\u{2193}").expect("next match button visible");
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
@@ -67,6 +67,83 @@ fn search_positions_handle_unicode_and_line_breaks() {
     assert_eq!(matches[0].0, text_editor::Position { line: 0, column: 5 });
     assert_eq!(matches[1].0, text_editor::Position { line: 1, column: 0 });
     assert_eq!(app.current().editor.selection().as_deref(), Some("alpha"));
+}
+
+#[test]
+fn search_open_tabs_finds_unsaved_text_and_opens_hidden_matches() {
+    let mut app = blank();
+    let mut first = Document::new();
+    first.edit("alpha first".into());
+    app.tabs[0] = Tab::new(0, first);
+    let _ = update(&mut app, Message::New);
+    let second_id = app.current().id;
+    app.current_mut().editor = text_editor::Content::with_text("alpha second");
+    app.current_mut().document.mark_edited();
+
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("Find").expect("find control visible");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("All tabs").expect("all-tabs scope visible");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert!(app.show_search && app.search_all_tabs);
+
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("Search open tabs")
+        .expect("global search field visible");
+    ui.typewrite("alpha");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.tab_search_hits.len(), 2);
+    assert_eq!(app.tab_search_hits[0].tab_id, 0);
+    assert_eq!(app.tab_search_hits[1].tab_id, second_id);
+
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("1: Untitled:1  alpha first")
+        .expect("hidden first tab result visible");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.current().id, 0);
+    assert_eq!(app.current().editor.selection().as_deref(), Some("alpha"));
+    assert!(app.show_search && app.search_all_tabs);
+
+    let _ = update(&mut app, Message::FindNext);
+    assert_eq!(app.current().id, second_id);
+    assert_eq!(app.current().editor.selection().as_deref(), Some("alpha"));
+}
+
+#[test]
+fn global_search_shortcut_opens_the_all_tabs_scope() {
+    let mut app = blank();
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("F".into()),
+        Modifiers::COMMAND | Modifiers::SHIFT,
+    )]);
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert!(app.show_search && app.search_all_tabs);
+}
+
+#[test]
+fn font_picker_is_available_in_headless_ui() {
+    let mut app = blank();
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("Font").expect("font control visible");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert!(app.show_font_picker);
+    assert!(simulator(crate::ui::view(&app)).find("Monospace").is_ok());
 }
 
 #[test]

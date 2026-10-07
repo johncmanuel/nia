@@ -1,24 +1,45 @@
 use crate::app::{App, EDITOR, Message, OUTLINE, RECENT, Tab};
-use crate::markdown::{self, MarkdownHighlighter};
+use crate::markdown::{self, HighlightSettings, MarkdownHighlighter};
 use crate::ui::reading::reading_view;
 use iced::widget::{button, column, container, row, scrollable, text, text_editor, text_input};
 use iced::{Background, Border, Element, Length};
 
 pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Element<'a, Message> {
+    let line = tab.editor.cursor().position.line;
+    let highlight = HighlightSettings {
+        font: state.editor_font,
+        active_line: active.then_some(line),
+        context: (active && state.focus.typewriter).then_some((
+            line.saturating_sub(usize::from(state.focus.lines_above)),
+            line.saturating_add(usize::from(state.focus.lines_below)),
+        )),
+        focus: active
+            .then(|| crate::focus::active_span(&tab.editor, state.focus.dimming))
+            .flatten(),
+        highlight_line: active && state.focus.highlight_line,
+    };
     let mut editor = text_editor(&tab.editor)
         .id(if active {
             EDITOR.to_string()
         } else {
             format!("editor-{}", tab.id)
         })
-        .highlight_with::<MarkdownHighlighter>(state.editor_font, markdown::format)
+        .highlight_with::<MarkdownHighlighter>(highlight, markdown::format)
         .placeholder("# Start writing")
         .font(state.editor_font)
         .size(u32::from(state.editor_font_size))
         .line_height(text::LineHeight::Relative(1.55))
-        .wrapping(text::Wrapping::Word)
+        .wrapping(text::Wrapping::WordOrGlyph)
         .padding(0)
-        .height(Length::Fill)
+        .height(if active && state.focus.typewriter {
+            Length::Fixed(
+                f32::from(state.editor_font_size)
+                    * 1.55
+                    * f32::from(state.focus.lines_above + state.focus.lines_below + 1),
+            )
+        } else {
+            Length::Fill
+        })
         .style(|theme, status| {
             let mut style = text_editor::default(theme, status);
             let mut background = theme.palette().background;
@@ -50,6 +71,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
             .width(Length::Fill)
             .max_width(760)
             .height(Length::Fill)
+            .center_y(Length::Fill)
             .into()
     };
     let mut content = column![]
@@ -57,7 +79,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         .width(Length::Fill)
         .max_width(760)
         .height(Length::Fill);
-    if tab.conflict {
+    if tab.conflict && !state.zen_mode {
         content = content.push(
             row![
                 text("File changed or is unavailable on disk. Your edits are still here.").size(12),
@@ -67,7 +89,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
             .align_y(iced::Alignment::Center),
         );
     }
-    if active && state.show_outline {
+    if active && state.show_outline && !state.zen_mode {
         let headings = state.outline_items();
         let mut results = column![].spacing(2);
         for (index, heading) in headings.iter().enumerate() {
@@ -103,7 +125,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
             .spacing(8),
         );
     }
-    if active && state.show_recent {
+    if active && state.show_recent && !state.zen_mode {
         let mut results = column![].spacing(2);
         for (index, path) in state.recent_items().iter().enumerate() {
             results = results.push(
@@ -138,7 +160,9 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         .width(Length::Fill)
         .height(Length::Fill)
         .center_x(Length::Fill)
-        .padding(if state.panes.len() > 1 {
+        .padding(if state.zen_mode {
+            [64, 32]
+        } else if state.panes.len() > 1 {
             [24, 20]
         } else {
             [48, 32]

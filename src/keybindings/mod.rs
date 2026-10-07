@@ -26,10 +26,12 @@ pub(crate) enum Slot {
     IncreaseFontSize,
     DecreaseFontSize,
     Settings,
+    Zen,
+    Typewriter,
 }
 
 impl Slot {
-    pub(crate) const ALL: [Self; 19] = [
+    pub(crate) const ALL: [Self; 21] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -49,6 +51,8 @@ impl Slot {
         Self::IncreaseFontSize,
         Self::DecreaseFontSize,
         Self::Settings,
+        Self::Zen,
+        Self::Typewriter,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -72,6 +76,8 @@ impl Slot {
             Self::IncreaseFontSize => "Increase editor font size",
             Self::DecreaseFontSize => "Decrease editor font size",
             Self::Settings => "Open settings",
+            Self::Zen => "Toggle Zen mode",
+            Self::Typewriter => "Toggle typewriter mode",
         }
     }
 }
@@ -257,6 +263,8 @@ impl Default for Keybindings {
                         Modifiers::CTRL
                     },
                 ),
+                Shortcut::new('j', Modifiers::COMMAND | Modifiers::SHIFT),
+                Shortcut::new('y', Modifiers::COMMAND | Modifiers::SHIFT),
             ],
         }
     }

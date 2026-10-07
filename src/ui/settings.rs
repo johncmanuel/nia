@@ -1,13 +1,23 @@
 use super::{footer_button, muted_text, theme};
 use crate::app::{App, Message};
+use crate::focus::{Dimming, MAX_CONTEXT};
 use crate::keybindings::Slot;
 use iced::theme::Base;
-use iced::widget::{button, checkbox, column, combo_box, container, row, scrollable, space, text};
+use iced::widget::{
+    button, checkbox, column, combo_box, container, pick_list, row, scrollable, space, text,
+};
 use iced::{Element, Length};
 
 pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
     let mut rows = column![
-        text("Settings").size(26),
+        row![
+            text("Settings").size(26),
+            space::horizontal(),
+            button("Back to writing")
+                .style(button::secondary)
+                .on_press(Message::ShowEditor),
+        ]
+        .align_y(iced::Alignment::Center),
         text("Appearance").size(18),
         text("Theme").size(15),
         button(text(state.theme.name()).size(14))
@@ -59,6 +69,48 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
                 button("Larger")
                     .style(button::secondary)
                     .on_press(Message::IncreaseFontSize),
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
+        )
+        .push(text("Focus").size(18))
+        .push(
+            checkbox(state.zen_mode)
+                .label("Zen mode")
+                .on_toggle(|_| Message::ToggleZen),
+        )
+        .push(
+            checkbox(state.focus.typewriter)
+                .label("Typewriter scrolling")
+                .on_toggle(|_| Message::ToggleTypewriter),
+        )
+        .push(
+            checkbox(state.focus.highlight_line)
+                .label("Highlight current line")
+                .on_toggle(Message::SetHighlightLine),
+        )
+        .push(
+            row![
+                text(format!("Lines above: {}", state.focus.lines_above)),
+                button("-")
+                    .on_press(Message::SetLinesAbove(state.focus.lines_above.saturating_sub(1))),
+                button("+").on_press(Message::SetLinesAbove(
+                    state.focus.lines_above.saturating_add(1).min(MAX_CONTEXT)
+                )),
+                text(format!("Lines below: {}", state.focus.lines_below)),
+                button("-")
+                    .on_press(Message::SetLinesBelow(state.focus.lines_below.saturating_sub(1))),
+                button("+").on_press(Message::SetLinesBelow(
+                    state.focus.lines_below.saturating_add(1).min(MAX_CONTEXT)
+                )),
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
+        )
+        .push(
+            row![
+                text("Dim unfocused"),
+                pick_list(Dimming::ALL, Some(state.focus.dimming), Message::SetDimming),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),

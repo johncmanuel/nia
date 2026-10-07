@@ -1,4 +1,5 @@
 use crate::document::Document;
+use crate::focus;
 use crate::font;
 use crate::keybindings::{Keybindings, Slot};
 use crate::recent;
@@ -29,6 +30,7 @@ pub(crate) struct Tab {
     pub(crate) id: u64,
     pub(crate) document: Document,
     pub(crate) editor: text_editor::Content,
+    typewriter_aligned: bool,
     pub(crate) reading: Option<markdown::Content>,
     pub(crate) saving: bool,
     pub(crate) checking: bool,
@@ -47,6 +49,7 @@ impl Tab {
             id,
             document,
             editor,
+            typewriter_aligned: false,
             reading: None,
             saving: false,
             checking: false,
@@ -78,6 +81,55 @@ impl Tab {
             self.reading = Some(markdown::Content::parse(&self.editor.text()));
         }
     }
+
+    fn align_typewriter(&mut self, lines_above: u8) {
+        if self.typewriter_aligned {
+            return;
+        }
+        let line = self.editor.cursor().position.line;
+        let scroll = line.saturating_sub(usize::from(lines_above));
+        if scroll > 0 {
+            self.editor.perform(text_editor::Action::Scroll {
+                lines: scroll.min(i32::MAX as usize) as i32,
+            });
+        }
+        self.typewriter_aligned = true;
+    }
+
+    fn follow_typewriter(&mut self, old_line: usize, focus: focus::Settings) {
+        if !focus.typewriter {
+            return;
+        }
+        if !self.typewriter_aligned {
+            self.align_typewriter(focus.lines_above);
+            return;
+        }
+        let new_line = self.editor.cursor().position.line;
+        let distance = new_line.abs_diff(old_line).min(i32::MAX as usize) as i32;
+        let lines = if new_line >= old_line {
+            distance
+        } else {
+            -distance
+        };
+        if lines != 0 {
+            self.editor.perform(text_editor::Action::Scroll { lines });
+        }
+    }
+
+    fn perform_editor_action(&mut self, action: text_editor::Action, focus: focus::Settings) {
+        if focus.typewriter && matches!(action, text_editor::Action::Scroll { .. }) {
+            return;
+        }
+        let old_line = self.editor.cursor().position.line;
+        self.editor.perform(action);
+        self.follow_typewriter(old_line, focus);
+    }
+
+    fn move_editor_to(&mut self, cursor: text_editor::Cursor, focus: focus::Settings) {
+        let old_line = self.editor.cursor().position.line;
+        self.editor.move_to(cursor);
+        self.follow_typewriter(old_line, focus);
+    }
 }
 
 pub(crate) struct App {
@@ -92,6 +144,8 @@ pub(crate) struct App {
     pub(crate) dialog_open: bool,
     pub(crate) keybindings: Keybindings,
     pub(crate) show_settings: bool,
+    pub(crate) zen_mode: bool,
+    pub(crate) focus: focus::Settings,
     pub(crate) recording: Option<Slot>,
     pub(crate) theme: Theme,
     pub(crate) transparent_background: bool,
@@ -159,6 +213,13 @@ pub(crate) enum Message {
     CloseTab(usize),
     ShowSettings,
     ShowEditor,
+    ToggleZen,
+    ToggleTypewriter,
+    AlignTypewriter,
+    SetHighlightLine(bool),
+    SetLinesAbove(u8),
+    SetLinesBelow(u8),
+    SetDimming(focus::Dimming),
     ToggleReading,
     CopyLink(String),
     RecordShortcut(Slot),
@@ -283,6 +344,16 @@ pub(crate) fn blank() -> App {
             Some(format!("Could not load font size: {error}")),
         ),
     };
+    let (focus, focus_notice) = match focus::Settings::load() {
+        Ok(settings) => (settings, None),
+        Err(error) => {
+            log::warn!("focus settings load failed");
+            (
+                focus::Settings::default(),
+                Some(format!("Could not load focus settings: {error}")),
+            )
+        }
+    };
     let (panes, active_pane) = pane_grid::State::new(0);
     let state = App {
         tabs: vec![Tab::new(0, Document::new())],
@@ -295,11 +366,14 @@ pub(crate) fn blank() -> App {
             .or(theme_notice)
             .or(transparency_notice)
             .or(font_notice)
-            .or(size_notice),
+            .or(size_notice)
+            .or(focus_notice),
         loading: false,
         dialog_open: false,
         keybindings,
         show_settings: false,
+        zen_mode: false,
+        focus,
         recording: None,
         theme,
         transparent_background,
@@ -355,6 +429,8 @@ pub(crate) fn shortcut_message(slot: Slot) -> Message {
         Slot::IncreaseFontSize => Message::IncreaseFontSize,
         Slot::DecreaseFontSize => Message::DecreaseFontSize,
         Slot::Settings => Message::ShowSettings,
+        Slot::Zen => Message::ToggleZen,
+        Slot::Typewriter => Message::ToggleTypewriter,
     }
 }
 

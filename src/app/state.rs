@@ -98,10 +98,14 @@ impl App {
 
     pub(super) fn jump_match(&mut self, index: usize) {
         if let Some((start, end)) = self.search_matches().get(index).copied() {
-            self.current_mut().editor.move_to(text_editor::Cursor {
-                position: end,
-                selection: Some(start),
-            });
+            let focus = self.focus;
+            self.current_mut().move_editor_to(
+                text_editor::Cursor {
+                    position: end,
+                    selection: Some(start),
+                },
+                focus,
+            );
             self.search_index = Some(index);
         }
     }

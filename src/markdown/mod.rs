@@ -1,6 +1,6 @@
 mod highlight;
 
-pub(crate) use highlight::{MarkdownHighlighter, format};
+pub(crate) use highlight::{HighlightSettings, MarkdownHighlighter, format};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Heading {

@@ -1,4 +1,5 @@
 use super::{Fence, atx_heading, closes_fence, fenced_start, setext_level};
+use crate::focus::Span;
 use iced::advanced::text::highlighter;
 use iced::widget::text;
 use iced::{Font, Theme, font};
@@ -13,30 +14,62 @@ pub(crate) enum Kind {
     Emphasis,
     Strong,
     Link,
+    Current,
+    Dim,
+    Hidden,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct HighlightSettings {
+    pub(crate) font: Font,
+    pub(crate) active_line: Option<usize>,
+    pub(crate) context: Option<(usize, usize)>,
+    pub(crate) focus: Option<Span>,
+    pub(crate) highlight_line: bool,
 }
 
 pub(crate) struct MarkdownHighlighter {
-    font: Font,
+    settings: HighlightSettings,
     line: usize,
     fence: Option<Fence>,
     fences_after: Vec<Option<Fence>>,
 }
 
 impl text::Highlighter for MarkdownHighlighter {
-    type Settings = Font;
+    type Settings = HighlightSettings;
     type Highlight = (Kind, Font);
     type Iterator<'a> = std::vec::IntoIter<(Range<usize>, Self::Highlight)>;
 
-    fn new(font: &Font) -> Self {
+    fn new(settings: &HighlightSettings) -> Self {
         Self {
-            font: *font,
+            settings: *settings,
             line: 0,
             fence: None,
             fences_after: Vec::new(),
         }
     }
-    fn update(&mut self, font: &Font) {
-        self.font = *font;
+    fn update(&mut self, settings: &HighlightSettings) {
+        let first = if self.settings.font != settings.font {
+            0
+        } else {
+            [self.settings.active_line, settings.active_line]
+                .into_iter()
+                .flatten()
+                .chain(
+                    [
+                        self.settings.context.map(|(start, _)| start),
+                        settings.context.map(|(start, _)| start),
+                        self.settings.focus.map(|span| span.start.line),
+                        settings.focus.map(|span| span.start.line),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                )
+                .min()
+                .unwrap_or(0)
+        };
+        self.change_line(first);
+        self.settings = *settings;
     }
     fn change_line(&mut self, line: usize) {
         self.fences_after.truncate(line);
@@ -49,6 +82,7 @@ impl text::Highlighter for MarkdownHighlighter {
         self.line
     }
     fn highlight_line(&mut self, line: &str) -> Self::Iterator<'_> {
+        let line_index = self.line;
         self.line += 1;
         let mut ranges = Vec::new();
         if let Some(fence) = self.fence {
@@ -90,10 +124,30 @@ impl text::Highlighter for MarkdownHighlighter {
             }
             ranges.extend(inline_ranges(line, start));
         }
+        if self.settings.highlight_line && self.settings.active_line == Some(line_index) {
+            ranges.push((0..line.len(), Kind::Current));
+        }
+        if let Some(focus) = self.settings.focus {
+            if line_index < focus.start.line || line_index > focus.end.line {
+                ranges.push((0..line.len(), Kind::Dim));
+            } else {
+                if line_index == focus.start.line && focus.start.byte > 0 {
+                    ranges.push((0..focus.start.byte.min(line.len()), Kind::Dim));
+                }
+                if line_index == focus.end.line && focus.end.byte < line.len() {
+                    ranges.push((focus.end.byte..line.len(), Kind::Dim));
+                }
+            }
+        }
+        if let Some((start, end)) = self.settings.context
+            && (line_index < start || line_index > end)
+        {
+            ranges.push((0..line.len(), Kind::Hidden));
+        }
         self.fences_after.push(self.fence);
         ranges
             .into_iter()
-            .map(|(range, kind)| (range, (kind, self.font)))
+            .map(|(range, kind)| (range, (kind, self.settings.font)))
             .collect::<Vec<_>>()
             .into_iter()
     }
@@ -132,6 +186,17 @@ fn inline_ranges(line: &str, mut index: usize) -> Vec<(Range<usize>, Kind)> {
 
 pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlighter::Format<Font> {
     let palette = theme.palette();
+    if matches!(kind, Kind::Current | Kind::Dim | Kind::Hidden) {
+        return highlighter::Format {
+            color: Some(match kind {
+                Kind::Current => palette.primary,
+                Kind::Dim => palette.text.scale_alpha(0.25),
+                Kind::Hidden => palette.text.scale_alpha(0.0),
+                _ => unreachable!(),
+            }),
+            font: None,
+        };
+    }
     let (color, weight) = match kind {
         Kind::Heading => (palette.primary, font::Weight::Bold),
         Kind::Marker | Kind::Quote => (palette.text.scale_alpha(0.58), font::Weight::Normal),
@@ -139,6 +204,7 @@ pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlig
         Kind::Emphasis => (palette.text, font::Weight::Medium),
         Kind::Strong => (palette.text, font::Weight::Bold),
         Kind::Link => (palette.primary, font::Weight::Normal),
+        Kind::Current | Kind::Dim | Kind::Hidden => unreachable!(),
     };
     highlighter::Format {
         color: Some(color),

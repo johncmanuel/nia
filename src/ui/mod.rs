@@ -18,9 +18,13 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
     if state.pending_close.is_some() {
         return close_confirmation(state);
     }
-    let writing_area: Element<'_, Message> = if state.show_settings {
-        settings_page(state)
-    } else {
+    if state.show_settings {
+        return settings_page(state);
+    }
+    if state.zen_mode {
+        return editor_view(state, state.current(), true);
+    }
+    let writing_area: Element<'_, Message> =
         pane_grid::PaneGrid::new(&state.panes, |pane, tab_id, _| {
             let tab = state
                 .tabs
@@ -51,8 +55,7 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
         .on_click(Message::ActivatePane)
         .on_drag(Message::PaneDragged)
         .on_resize(8, Message::PaneResized)
-        .into()
-    };
+        .into();
 
     let status = state.notice.as_deref().unwrap_or_else(|| {
         if state.loading {
@@ -95,6 +98,10 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
         .padding(0)
         .style(footer_button)
         .on_press(Message::ToggleReading),
+        button(text("Zen").size(12))
+            .padding(0)
+            .style(footer_button)
+            .on_press(Message::ToggleZen),
         button(text("Find").size(12))
             .padding(0)
             .style(footer_button)
@@ -107,21 +114,10 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
             .padding(0)
             .style(footer_button)
             .on_press(Message::ShowRecent),
-        button(
-            text(if state.show_settings {
-                "Write"
-            } else {
-                "Settings"
-            })
-            .size(12)
-        )
-        .padding(0)
-        .style(footer_button)
-        .on_press(if state.show_settings {
-            Message::ShowEditor
-        } else {
-            Message::ShowSettings
-        }),
+        button(text("Settings").size(12))
+            .padding(0)
+            .style(footer_button)
+            .on_press(Message::ShowSettings),
         text(status).size(12).style(muted_text),
         space::horizontal(),
         text(format!("{} words", state.current().document.word_count))

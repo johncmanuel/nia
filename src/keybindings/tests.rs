@@ -1,6 +1,30 @@
 use super::*;
 
 #[test]
+fn older_keybindings_gain_focus_shortcuts() {
+    let defaults = Keybindings::default();
+    let old = defaults
+        .encode()
+        .lines()
+        .take(19)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let restored = Keybindings::decode(&old).expect("previous keybindings file");
+    assert_eq!(restored.get(Slot::Zen), defaults.get(Slot::Zen));
+    assert_eq!(
+        restored.get(Slot::Typewriter),
+        defaults.get(Slot::Typewriter)
+    );
+    assert_eq!(
+        restored.matching(
+            &Key::Character("j".into()),
+            Modifiers::COMMAND | Modifiers::SHIFT
+        ),
+        Some(Slot::Zen)
+    );
+}
+
+#[test]
 fn settings_shortcut_round_trips_and_is_added_to_old_settings() {
     let defaults = Keybindings::default();
     let modifiers = if cfg!(target_os = "macos") {

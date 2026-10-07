@@ -21,9 +21,64 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             state.current_mut().reading = None;
             state.recording = None;
             state.notice = None;
-            return operation::focus(EDITOR);
+            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+        }
+        Message::ToggleZen => {
+            state.zen_mode = !state.zen_mode;
+            if state.zen_mode && !state.show_settings {
+                state.show_layout = false;
+                state.clear_search();
+                state.current_mut().reading = None;
+            }
+            if state.show_settings {
+                return Task::none();
+            }
+            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+        }
+        Message::ToggleTypewriter => {
+            state.focus.typewriter = !state.focus.typewriter;
+            for tab in &mut state.tabs {
+                tab.typewriter_aligned = false;
+            }
+            save_focus(state);
+            if state.focus.typewriter && !state.show_settings {
+                return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+            }
+        }
+        Message::AlignTypewriter => {
+            if state.focus.typewriter && !state.show_settings {
+                let above = state.focus.lines_above;
+                state.current_mut().align_typewriter(above);
+            }
+        }
+        Message::SetHighlightLine(enabled) => {
+            state.focus.highlight_line = enabled;
+            save_focus(state);
+        }
+        Message::SetLinesAbove(count) => {
+            let count = count.min(crate::focus::MAX_CONTEXT);
+            let difference = i32::from(state.focus.lines_above) - i32::from(count);
+            state.focus.lines_above = count;
+            if state.focus.typewriter && difference != 0 {
+                for tab in &mut state.tabs {
+                    if tab.typewriter_aligned {
+                        tab.editor
+                            .perform(text_editor::Action::Scroll { lines: difference });
+                    }
+                }
+            }
+            save_focus(state);
+        }
+        Message::SetLinesBelow(count) => {
+            state.focus.lines_below = count.min(crate::focus::MAX_CONTEXT);
+            save_focus(state);
+        }
+        Message::SetDimming(dimming) => {
+            state.focus.dimming = dimming;
+            save_focus(state);
         }
         Message::ToggleReading => {
+            state.zen_mode = false;
             state.show_settings = false;
             if state.current().reading.is_some() {
                 state.current_mut().reading = None;
@@ -116,6 +171,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 .map(|error| format!("Could not save font size: {error}"));
         }
         Message::ShowSearch => {
+            state.zen_mode = false;
             state.current_mut().reading = None;
             state.show_layout = false;
             state.show_settings = false;
@@ -128,6 +184,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             return operation::focus(SEARCH);
         }
         Message::ShowTabSearch => {
+            state.zen_mode = false;
             state.current_mut().reading = None;
             state.show_layout = false;
             state.show_settings = false;
@@ -215,6 +272,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ShowOutline => {
+            state.zen_mode = false;
             state.current_mut().reading = None;
             state.show_settings = false;
             state.show_search = false;
@@ -250,15 +308,20 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         Message::JumpOutline(index) => {
             if let Some(heading) = state.outline_items().get(index) {
                 let line = heading.line;
-                state.current_mut().editor.move_to(text_editor::Cursor {
-                    position: text_editor::Position { line, column: 0 },
-                    selection: None,
-                });
+                let focus = state.focus;
+                state.current_mut().move_editor_to(
+                    text_editor::Cursor {
+                        position: text_editor::Position { line, column: 0 },
+                        selection: None,
+                    },
+                    focus,
+                );
                 state.show_outline = false;
                 return operation::focus(EDITOR);
             }
         }
         Message::ShowRecent => {
+            state.zen_mode = false;
             state.show_settings = false;
             state.show_search = false;
             state.show_outline = false;
@@ -353,6 +416,9 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 if state.show_settings {
                     return update(state, Message::ShowEditor);
                 }
+                if state.zen_mode {
+                    return update(state, Message::ToggleZen);
+                }
             } else if state.show_outline && key == Key::Named(Named::ArrowDown) {
                 return update(state, Message::OutlineNext);
             } else if state.show_outline && key == Key::Named(Named::ArrowUp) {
@@ -368,4 +434,15 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         _ => unreachable!("non-overlay message routed to overlays"),
     }
     Task::none()
+}
+
+fn save_focus(state: &mut App) {
+    state.notice = state
+        .focus
+        .save()
+        .err()
+        .map(|error| format!("Could not save focus settings: {error}"));
+    if state.notice.is_some() {
+        log::warn!("focus settings save failed");
+    }
 }

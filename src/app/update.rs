@@ -17,9 +17,10 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
                 state.active_pane = pane;
             }
+            let focus = state.focus;
             let tab = state.current_mut();
             let changed = action.is_edit();
-            tab.editor.perform(action);
+            tab.perform_editor_action(action, focus);
             if changed {
                 tab.refresh_reading();
                 tab.document.mark_edited();
@@ -40,7 +41,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             state.show_layout = false;
             state.push_tab(Document::new());
             log::info!("new document tab");
-            return operation::focus(EDITOR);
+            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
         }
         message @ (Message::Open
         | Message::OpenPicked(_)
@@ -67,7 +68,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             state.show_settings = false;
             state.clear_search();
             state.notice = None;
-            return operation::focus(EDITOR);
+            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
         }
         Message::CloseCurrentTab => {
             let active = state.active;
@@ -121,7 +122,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 state.active_pane = pane;
                 state.clear_search();
                 log::info!("editor pane split");
-                return operation::focus(EDITOR);
+                return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
             }
         }
         Message::ClosePane(pane) => {

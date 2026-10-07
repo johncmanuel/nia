@@ -1,4 +1,60 @@
 use super::*;
+use iced::keyboard::key::Named;
+
+#[test]
+fn defaults_use_the_operating_system_primary_modifier() {
+    let defaults = Keybindings::default();
+    let (primary, prefix) = if cfg!(target_os = "macos") {
+        (Modifiers::LOGO, "Cmd+")
+    } else {
+        (Modifiers::CTRL, "Ctrl+")
+    };
+    for (slot, key, shifted) in [
+        (Slot::New, "n", false),
+        (Slot::Open, "o", false),
+        (Slot::Save, "s", false),
+        (Slot::Find, "f", false),
+        (Slot::Outline, "o", true),
+        (Slot::Recent, "p", false),
+        (Slot::NewTab, "t", false),
+        (Slot::CloseTab, "w", false),
+        (Slot::FindTabs, "f", true),
+        (Slot::IncreaseFontSize, "+", false),
+        (Slot::DecreaseFontSize, "-", false),
+        (Slot::Settings, ",", false),
+        (Slot::Zen, "j", true),
+        (Slot::Typewriter, "y", true),
+    ] {
+        let modifiers = if shifted {
+            primary | Modifiers::SHIFT
+        } else {
+            primary
+        };
+        assert_eq!(
+            defaults.matching(&Key::Character(key.into()), modifiers),
+            Some(slot)
+        );
+        assert!(
+            defaults
+                .get(slot)
+                .expect("default shortcut")
+                .label()
+                .starts_with(prefix)
+        );
+    }
+    assert_eq!(
+        defaults.matching(&Key::Named(Named::Tab), Modifiers::CTRL),
+        Some(Slot::NextTab)
+    );
+    if !cfg!(target_os = "macos") {
+        assert_eq!(defaults.get(Slot::AlternateSave), None);
+        assert_eq!(defaults.get(Slot::AlternateFind), None);
+        assert_eq!(
+            defaults.matching(&Key::Character("s".into()), Modifiers::LOGO),
+            None
+        );
+    }
+}
 
 #[test]
 fn older_keybindings_gain_focus_shortcuts() {
@@ -70,7 +126,7 @@ fn increase_font_size_uses_command_plus_without_extra_shift() {
         if cfg!(target_os = "macos") {
             "Cmd++"
         } else {
-            "Super++"
+            "Ctrl++"
         }
     );
     for modifiers in [Modifiers::COMMAND, Modifiers::COMMAND | Modifiers::SHIFT] {
@@ -79,7 +135,10 @@ fn increase_font_size_uses_command_plus_without_extra_shift() {
             Some(Slot::IncreaseFontSize)
         );
     }
-    let prior = defaults.encode().replace("meta+plus", "meta+shift+plus");
+    let prior = defaults
+        .encode()
+        .replace("meta+plus", "meta+shift+plus")
+        .replace("ctrl+plus", "ctrl+shift+plus");
     let restored = Keybindings::decode(&prior).expect("previous font shortcut setting");
     assert_eq!(restored.get(Slot::IncreaseFontSize), Some(shortcut));
 }
@@ -158,8 +217,18 @@ fn assigned_shortcuts_match_exactly_and_reject_conflicts() {
 #[test]
 fn old_four_shortcut_settings_keep_default_find() {
     let old = Keybindings::default().encode();
-    let old = old.lines().take(4).collect::<Vec<_>>().join("\n");
+    let old = old.lines().take(4).collect::<Vec<_>>().join("\n") + "\n";
     let loaded = Keybindings::decode(&old).expect("valid previous settings");
+    assert_eq!(
+        loaded.get(Slot::Find),
+        Keybindings::default().get(Slot::Find)
+    );
+}
+
+#[test]
+fn old_settings_with_only_required_shortcuts_keep_default_find() {
+    let loaded = Keybindings::decode("ctrl+n\nctrl+o\nctrl+s")
+        .expect("valid previous settings without an alternate save binding");
     assert_eq!(
         loaded.get(Slot::Find),
         Keybindings::default().get(Slot::Find)

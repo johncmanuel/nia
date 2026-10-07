@@ -1,4 +1,4 @@
-use crate::keybindings::config_dir;
+use crate::config;
 use iced::widget::text_editor;
 use std::fmt;
 use std::fs;
@@ -56,7 +56,7 @@ impl Default for Settings {
 
 impl Settings {
     pub(crate) fn load() -> io::Result<Self> {
-        Self::load_from(&config_dir()?.join("focus.conf"))
+        Self::load_from(&config::directory()?.join("focus.conf"))
     }
 
     fn load_from(path: &Path) -> io::Result<Self> {
@@ -97,7 +97,7 @@ impl Settings {
     }
 
     pub(crate) fn save(self) -> io::Result<()> {
-        self.save_to(&config_dir()?.join("focus.conf"))
+        self.save_to(&config::directory()?.join("focus.conf"))
     }
 
     fn save_to(self, path: &Path) -> io::Result<()> {

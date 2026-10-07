@@ -1,4 +1,4 @@
-use crate::keybindings::config_dir;
+use crate::config;
 use iced::Theme;
 use iced::theme::Base;
 use std::fs;
@@ -12,7 +12,7 @@ pub(crate) fn choices(dark: bool) -> impl Iterator<Item = &'static Theme> {
 }
 
 pub(crate) fn load() -> io::Result<Theme> {
-    load_from(&config_dir()?.join("theme.conf"))
+    load_from(&config::directory()?.join("theme.conf"))
 }
 
 fn load_from(path: &Path) -> io::Result<Theme> {
@@ -37,11 +37,11 @@ fn load_from(path: &Path) -> io::Result<Theme> {
 }
 
 pub(crate) fn save(theme: &Theme) -> io::Result<()> {
-    save_to(&config_dir()?.join("theme.conf"), theme)
+    save_to(&config::directory()?.join("theme.conf"), theme)
 }
 
 pub(crate) fn load_transparency() -> io::Result<bool> {
-    load_transparency_from(&config_dir()?.join("transparent.conf"))
+    load_transparency_from(&config::directory()?.join("transparent.conf"))
 }
 
 fn load_transparency_from(path: &Path) -> io::Result<bool> {
@@ -60,7 +60,7 @@ fn load_transparency_from(path: &Path) -> io::Result<bool> {
 }
 
 pub(crate) fn save_transparency(enabled: bool) -> io::Result<()> {
-    save_transparency_to(&config_dir()?.join("transparent.conf"), enabled)
+    save_transparency_to(&config::directory()?.join("transparent.conf"), enabled)
 }
 
 fn save_transparency_to(path: &Path, enabled: bool) -> io::Result<()> {

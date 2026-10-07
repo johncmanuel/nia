@@ -1,5 +1,6 @@
 # TODO
 
+- [ ] Verify the first GitHub Actions build and tagged release on Linux, Windows, and both macOS architectures after pushing the workflow.
 - [ ] Render Markdown images inline while writing. Read mode already displays local images.
 - [ ] Hide Markdown syntax while writing and render formatted text inline, including heading markers (for example, hide `#` and enlarge the heading text). Read mode already renders formatted text.
 - [ ] Make typewriter caret positioning exact for wrapped lines and document edges. Iced's text editor exposes relative line scrolling but not direct caret viewport positioning.

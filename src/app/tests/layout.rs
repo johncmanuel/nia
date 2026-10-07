@@ -145,3 +145,43 @@ fn closing_a_hidden_dirty_tab_brings_it_into_view() {
     assert_eq!(app.panes.get(app.active_pane), Some(&0));
     assert_eq!(app.current().document.contents, "keep me");
 }
+
+#[test]
+fn long_word_stays_inside_writing_area() {
+    let mut app = blank();
+    app.current_mut().editor = text_editor::Content::with_text(&"superlongword".repeat(100));
+    let mut ui = iced_test::Simulator::with_size(
+        iced::Settings::default(),
+        iced::Size::new(700.0, 500.0),
+        crate::ui::view(&app),
+    );
+    let directory = std::env::temp_dir().join(format!("nia-long-line-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    ui.snapshot(&app.theme)
+        .expect("render long line")
+        .matches_image(directory.join("preview.png"))
+        .expect("write preview");
+    let path = std::fs::read_dir(&directory)
+        .expect("read preview directory")
+        .next()
+        .expect("preview exists")
+        .expect("read preview entry")
+        .path();
+    let mut reader = png::Decoder::new(std::io::BufReader::new(
+        std::fs::File::open(path).expect("open preview"),
+    ))
+    .read_info()
+    .expect("decode preview");
+    let mut pixels = vec![0; reader.output_buffer_size().expect("preview size")];
+    reader.next_frame(&mut pixels).expect("read preview pixels");
+    // iced_test renders at 2x scale. Sample the right margin below the tab bar.
+    let background = &pixels[..3];
+    assert!(
+        (200..300).all(|y| (1360..1400).all(|x| {
+            let index = (y * 1400 + x) * 4;
+            pixels[index..index + 3] == *background
+        })),
+        "text painted into the right margin"
+    );
+    std::fs::remove_dir_all(directory).expect("remove preview");
+}

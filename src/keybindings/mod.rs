@@ -1,224 +1,14 @@
-use iced::keyboard::{Key, Modifiers, key::Named};
-use std::env;
+use crate::config;
+use iced::keyboard::{Key, Modifiers};
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(usize)]
-pub(crate) enum Slot {
-    New,
-    Open,
-    Save,
-    AlternateSave,
-    Find,
-    AlternateFind,
-    Outline,
-    Recent,
-    NewTab,
-    CloseTab,
-    NextTab,
-    PreviousTab,
-    SinglePane,
-    SplitRight,
-    SplitDown,
-    FindTabs,
-    IncreaseFontSize,
-    DecreaseFontSize,
-    Settings,
-    Zen,
-    Typewriter,
-}
+mod shortcut;
+mod slot;
 
-impl Slot {
-    pub(crate) const ALL: [Self; 21] = [
-        Self::New,
-        Self::Open,
-        Self::Save,
-        Self::AlternateSave,
-        Self::Find,
-        Self::AlternateFind,
-        Self::Outline,
-        Self::Recent,
-        Self::NewTab,
-        Self::CloseTab,
-        Self::NextTab,
-        Self::PreviousTab,
-        Self::SinglePane,
-        Self::SplitRight,
-        Self::SplitDown,
-        Self::FindTabs,
-        Self::IncreaseFontSize,
-        Self::DecreaseFontSize,
-        Self::Settings,
-        Self::Zen,
-        Self::Typewriter,
-    ];
-
-    pub(crate) fn label(self) -> &'static str {
-        match self {
-            Self::New => "New document",
-            Self::Open => "Open document",
-            Self::Save => "Save document",
-            Self::AlternateSave => "Save document (alternate)",
-            Self::Find => "Find in document",
-            Self::AlternateFind => "Find in document (alternate)",
-            Self::Outline => "Document outline",
-            Self::Recent => "Recent documents",
-            Self::NewTab => "New tab",
-            Self::CloseTab => "Close tab",
-            Self::NextTab => "Next tab",
-            Self::PreviousTab => "Previous tab",
-            Self::SinglePane => "Single pane",
-            Self::SplitRight => "Split right",
-            Self::SplitDown => "Split down",
-            Self::FindTabs => "Find in open tabs",
-            Self::IncreaseFontSize => "Increase editor font size",
-            Self::DecreaseFontSize => "Decrease editor font size",
-            Self::Settings => "Open settings",
-            Self::Zen => "Toggle Zen mode",
-            Self::Typewriter => "Toggle typewriter mode",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ShortcutKey {
-    Character(char),
-    Tab,
-    Plus,
-    Minus,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Shortcut {
-    key: ShortcutKey,
-    modifiers: Modifiers,
-}
-
-impl Shortcut {
-    fn new(key: char, modifiers: Modifiers) -> Option<Self> {
-        let key = key.to_ascii_lowercase();
-        if !key.is_ascii_alphanumeric() && !matches!(key, '+' | '-' | '=' | ',')
-            || !modifiers.intersects(Modifiers::CTRL | Modifiers::LOGO)
-            || modifiers.alt()
-        {
-            return None;
-        }
-        let mut modifiers = modifiers;
-        if key == '+' || key == '=' {
-            modifiers.remove(Modifiers::SHIFT);
-        }
-        Some(Self {
-            key: match key {
-                '+' | '=' => ShortcutKey::Plus,
-                '-' => ShortcutKey::Minus,
-                _ => ShortcutKey::Character(key),
-            },
-            modifiers,
-        })
-    }
-
-    fn tab(modifiers: Modifiers) -> Option<Self> {
-        (modifiers.intersects(Modifiers::CTRL | Modifiers::LOGO) && !modifiers.alt()).then_some(
-            Self {
-                key: ShortcutKey::Tab,
-                modifiers,
-            },
-        )
-    }
-
-    pub(crate) fn from_event(key: &Key, modifiers: Modifiers) -> Option<Self> {
-        if *key == Key::Named(Named::Tab) {
-            return Self::tab(modifiers);
-        }
-        let Key::Character(value) = key else {
-            return None;
-        };
-        let mut characters = value.chars();
-        let character = characters.next()?;
-        if characters.next().is_some() {
-            return None;
-        }
-        Self::new(character, modifiers)
-    }
-
-    pub(crate) fn label(self) -> String {
-        let mut label = String::new();
-        if self.modifiers.logo() {
-            label.push_str(if cfg!(target_os = "macos") {
-                "Cmd+"
-            } else {
-                "Super+"
-            });
-        }
-        if self.modifiers.control() {
-            label.push_str("Ctrl+");
-        }
-        if self.modifiers.shift() {
-            label.push_str("Shift+");
-        }
-        match self.key {
-            ShortcutKey::Character(key) => label.push(key.to_ascii_uppercase()),
-            ShortcutKey::Tab => label.push_str("Tab"),
-            ShortcutKey::Plus => label.push('+'),
-            ShortcutKey::Minus => label.push('-'),
-        }
-        label
-    }
-
-    fn encode(self) -> String {
-        let mut value = String::new();
-        if self.modifiers.logo() {
-            value.push_str("meta+");
-        }
-        if self.modifiers.control() {
-            value.push_str("ctrl+");
-        }
-        if self.modifiers.shift() {
-            value.push_str("shift+");
-        }
-        match self.key {
-            ShortcutKey::Character(key) => value.push(key),
-            ShortcutKey::Tab => value.push_str("tab"),
-            ShortcutKey::Plus => value.push_str("plus"),
-            ShortcutKey::Minus => value.push_str("minus"),
-        }
-        value
-    }
-
-    fn decode(value: &str) -> Option<Self> {
-        let (prefix, key) = value.rsplit_once('+')?;
-        let mut modifiers = Modifiers::NONE;
-        for part in prefix.split('+') {
-            let modifier = match part {
-                "meta" => Modifiers::LOGO,
-                "ctrl" => Modifiers::CTRL,
-                "shift" => Modifiers::SHIFT,
-                _ => return None,
-            };
-            if modifiers.contains(modifier) {
-                return None;
-            }
-            modifiers.insert(modifier);
-        }
-        if key == "tab" {
-            return Self::tab(modifiers);
-        }
-        if key == "plus" {
-            return Self::new('+', modifiers);
-        }
-        if key == "minus" {
-            return Self::new('-', modifiers);
-        }
-        let mut characters = key.chars();
-        let character = characters.next()?;
-        if characters.next().is_some() {
-            return None;
-        }
-        Self::new(character, modifiers)
-    }
-}
+pub(crate) use shortcut::Shortcut;
+pub(crate) use slot::Slot;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Keybindings {
@@ -227,6 +17,7 @@ pub(crate) struct Keybindings {
 
 impl Default for Keybindings {
     fn default() -> Self {
+        // Iced maps COMMAND to Command on macOS and Control on Windows/Linux.
         Self {
             shortcuts: [
                 Shortcut::new('n', Modifiers::COMMAND),
@@ -255,14 +46,7 @@ impl Default for Keybindings {
                 Shortcut::new('f', Modifiers::COMMAND | Modifiers::SHIFT),
                 Shortcut::new('+', Modifiers::COMMAND),
                 Shortcut::new('-', Modifiers::COMMAND),
-                Shortcut::new(
-                    ',',
-                    if cfg!(target_os = "macos") {
-                        Modifiers::COMMAND
-                    } else {
-                        Modifiers::CTRL
-                    },
-                ),
+                Shortcut::new(',', Modifiers::COMMAND),
                 Shortcut::new('j', Modifiers::COMMAND | Modifiers::SHIFT),
                 Shortcut::new('y', Modifiers::COMMAND | Modifiers::SHIFT),
             ],
@@ -368,30 +152,8 @@ impl Keybindings {
     }
 }
 
-pub(crate) fn config_dir() -> io::Result<PathBuf> {
-    #[cfg(target_os = "windows")]
-    let base = env::var_os("APPDATA").map(PathBuf::from);
-
-    #[cfg(target_os = "macos")]
-    let base = env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join("Library/Application Support"));
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    let base = env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            env::var_os("HOME")
-                .map(PathBuf::from)
-                .map(|home| home.join(".config"))
-        });
-
-    base.map(|base| base.join("nia"))
-        .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "configuration directory unavailable"))
-}
-
 fn config_path() -> io::Result<PathBuf> {
-    Ok(config_dir()?.join("keybindings.conf"))
+    Ok(config::directory()?.join("keybindings.conf"))
 }
 
 #[cfg(test)]

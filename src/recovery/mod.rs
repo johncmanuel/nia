@@ -1,4 +1,4 @@
-use crate::keybindings::config_dir;
+use crate::config;
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
@@ -22,7 +22,7 @@ pub(crate) fn new_key() -> String {
 }
 
 fn directory() -> io::Result<PathBuf> {
-    Ok(config_dir()?.join("recovery"))
+    Ok(config::directory()?.join("recovery"))
 }
 
 fn path_in(directory: &Path, key: &str) -> io::Result<PathBuf> {

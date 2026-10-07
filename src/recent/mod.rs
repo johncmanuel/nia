@@ -1,4 +1,4 @@
-use crate::keybindings::config_dir;
+use crate::config;
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 const LIMIT: usize = 20;
 
 pub(crate) fn load() -> io::Result<Vec<PathBuf>> {
-    match fs::read(config_dir()?.join("recent.conf")) {
+    match fs::read(config::directory()?.join("recent.conf")) {
         Ok(bytes) => Ok(decode(&bytes)),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(Vec::new()),
         Err(error) => Err(error),
@@ -14,7 +14,7 @@ pub(crate) fn load() -> io::Result<Vec<PathBuf>> {
 }
 
 pub(crate) fn save(paths: &[PathBuf]) -> io::Result<()> {
-    let directory = config_dir()?;
+    let directory = config::directory()?;
     fs::create_dir_all(&directory)?;
     let path = directory.join("recent.conf");
     let temporary = directory.join("recent.tmp");

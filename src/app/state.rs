@@ -26,7 +26,6 @@ impl App {
         self.search_index = None;
         self.search_hits.clear();
         self.tab_search_hits.clear();
-        self.show_outline = false;
         self.outline_query.clear();
         self.outline_index = 0;
         self.show_recent = false;

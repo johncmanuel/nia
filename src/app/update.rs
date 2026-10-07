@@ -1,4 +1,4 @@
-use super::{App, CloseTarget, EDITOR, Message, Tab, lifecycle, overlays};
+use super::{App, CloseTarget, EDITOR, Message, Tab, keyboard, lifecycle, overlays, preferences};
 use crate::document::Document;
 use iced::Task;
 use iced::widget::{operation, pane_grid};
@@ -166,7 +166,51 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             state.remove_tab(index);
             return operation::focus(EDITOR);
         }
-        message => return overlays::handle(state, message),
+        Message::KeyPressed(key, modifiers) => return keyboard::handle(state, key, modifiers),
+        message @ (Message::ToggleZen
+        | Message::ToggleTypewriter
+        | Message::AlignTypewriter
+        | Message::SetHighlightLine(_)
+        | Message::SetLinesAbove(_)
+        | Message::SetLinesBelow(_)
+        | Message::SetDimming(_)
+        | Message::RecordShortcut(_)
+        | Message::ResetKeybindings
+        | Message::SetTheme(_)
+        | Message::SetTransparentBackground(_)
+        | Message::ToggleThemePicker
+        | Message::HideThemePicker
+        | Message::SetFont(_)
+        | Message::ResetFont
+        | Message::IncreaseFontSize
+        | Message::DecreaseFontSize) => return preferences::handle(state, message),
+        message @ (Message::ShowSettings
+        | Message::ShowEditor
+        | Message::ToggleReading
+        | Message::CopyLink(_)
+        | Message::ShowSearch
+        | Message::ShowTabSearch
+        | Message::HideSearch
+        | Message::SearchAllTabs(_)
+        | Message::SearchChanged(_)
+        | Message::SearchCaseChanged(_)
+        | Message::FindNext
+        | Message::FindPrevious
+        | Message::JumpTabSearch(_)
+        | Message::ShowOutline
+        | Message::HideOutline
+        | Message::OutlineChanged(_)
+        | Message::OutlineNext
+        | Message::OutlinePrevious
+        | Message::JumpOutline(_)
+        | Message::JumpOutlineSelected
+        | Message::ShowRecent
+        | Message::HideRecent
+        | Message::RecentChanged(_)
+        | Message::RecentNext
+        | Message::RecentPrevious
+        | Message::OpenRecentSelected
+        | Message::OpenRecent(_)) => return overlays::handle(state, message),
     }
     Task::none()
 }

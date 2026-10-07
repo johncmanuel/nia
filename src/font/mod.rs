@@ -1,4 +1,4 @@
-use crate::keybindings::config_dir;
+use crate::config;
 use iced::Font;
 use std::fs;
 use std::io::{self, ErrorKind};
@@ -37,7 +37,7 @@ pub(crate) fn font_for(family: &str) -> Font {
 }
 
 pub(crate) fn load() -> io::Result<Option<String>> {
-    load_from(&config_dir()?.join("font.conf"))
+    load_from(&config::directory()?.join("font.conf"))
 }
 
 fn load_from(path: &Path) -> io::Result<Option<String>> {
@@ -61,11 +61,11 @@ fn load_from(path: &Path) -> io::Result<Option<String>> {
 }
 
 pub(crate) fn save(family: Option<&str>) -> io::Result<()> {
-    save_to(&config_dir()?.join("font.conf"), family)
+    save_to(&config::directory()?.join("font.conf"), family)
 }
 
 pub(crate) fn load_size() -> io::Result<u16> {
-    load_size_from(&config_dir()?.join("font-size.conf"))
+    load_size_from(&config::directory()?.join("font-size.conf"))
 }
 
 fn load_size_from(path: &Path) -> io::Result<u16> {
@@ -82,7 +82,7 @@ fn load_size_from(path: &Path) -> io::Result<u16> {
 }
 
 pub(crate) fn save_size(size: u16) -> io::Result<()> {
-    save_size_to(&config_dir()?.join("font-size.conf"), size)
+    save_size_to(&config::directory()?.join("font-size.conf"), size)
 }
 
 fn save_size_to(path: &Path, size: u16) -> io::Result<()> {

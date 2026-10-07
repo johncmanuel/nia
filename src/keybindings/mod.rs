@@ -117,7 +117,7 @@ impl Keybindings {
 
     fn decode(contents: &str) -> Option<Self> {
         let lines: Vec<_> = contents.lines().collect();
-        if !(4..=Slot::ALL.len()).contains(&lines.len()) {
+        if !(3..=Slot::ALL.len()).contains(&lines.len()) {
             return None;
         }
         let mut bindings = Self {

@@ -217,8 +217,18 @@ fn assigned_shortcuts_match_exactly_and_reject_conflicts() {
 #[test]
 fn old_four_shortcut_settings_keep_default_find() {
     let old = Keybindings::default().encode();
-    let old = old.lines().take(4).collect::<Vec<_>>().join("\n");
+    let old = old.lines().take(4).collect::<Vec<_>>().join("\n") + "\n";
     let loaded = Keybindings::decode(&old).expect("valid previous settings");
+    assert_eq!(
+        loaded.get(Slot::Find),
+        Keybindings::default().get(Slot::Find)
+    );
+}
+
+#[test]
+fn old_settings_with_only_required_shortcuts_keep_default_find() {
+    let loaded = Keybindings::decode("ctrl+n\nctrl+o\nctrl+s")
+        .expect("valid previous settings without an alternate save binding");
     assert_eq!(
         loaded.get(Slot::Find),
         Keybindings::default().get(Slot::Find)

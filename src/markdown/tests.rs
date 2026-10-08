@@ -1,6 +1,16 @@
 use super::*;
 
 #[test]
+fn standalone_images_ignore_fences_and_inline_prose() {
+    assert_eq!(
+        standalone_images(
+            "Before\n![one](one.png)\n`![inline](skip.png)`\n```\n![fenced](skip.png)\n```\n![two](two.png)"
+        ),
+        vec![(1, "one.png".into()), (6, "two.png".into())]
+    );
+}
+
+#[test]
 fn headings_ignore_fences_and_recognize_setext() {
     let parsed = headings(
         "# One\n```md\n# Not a heading\n```\nUnderlined\n---\n  ### Three ###\n####### No\n# Literal#",

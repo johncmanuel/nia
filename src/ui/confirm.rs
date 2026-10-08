@@ -17,6 +17,12 @@ pub(super) fn close_confirmation(state: &App) -> Element<'_, Message> {
                 "Discard and Close",
             )
         }
+        Some(CloseTarget::Group(_)) => (
+            "Close this tab group?".into(),
+            "If you close without saving, unsaved changes in this group will be deleted.",
+            "Save and Close",
+            "Discard and Close",
+        ),
         Some(CloseTarget::Window(_)) => (
             "Quit nia?".into(),
             "If you quit without saving, your unsaved changes will be deleted.",

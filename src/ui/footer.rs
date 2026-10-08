@@ -37,6 +37,7 @@ pub(super) fn view(state: &App) -> Element<'_, Message> {
             },
         ),
         ("Recent", Message::ShowRecent),
+        ("Insert", Message::ToggleFormatMenu),
         ("Handbook", Message::ShowHandbook),
         ("Settings", Message::ShowSettings),
     ];

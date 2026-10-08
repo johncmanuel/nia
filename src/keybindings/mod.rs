@@ -48,6 +48,11 @@ impl Default for Keybindings {
                 Shortcut::new('-', Modifiers::COMMAND),
                 Shortcut::new(',', Modifiers::COMMAND),
                 Shortcut::new('j', Modifiers::COMMAND | Modifiers::SHIFT),
+                Shortcut::new('w', Modifiers::COMMAND | Modifiers::SHIFT),
+                Shortcut::new('b', Modifiers::COMMAND),
+                Shortcut::new('i', Modifiers::COMMAND),
+                Shortcut::new('z', Modifiers::COMMAND),
+                Shortcut::new('z', Modifiers::COMMAND | Modifiers::SHIFT),
             ],
         }
     }
@@ -123,8 +128,17 @@ impl Keybindings {
         let mut bindings = Self {
             shortcuts: [None; Slot::ALL.len()],
         };
-        let line_count = lines.len();
-        for (slot, line) in Slot::ALL.into_iter().zip(lines) {
+        let legacy_typewriter = lines.len() == Slot::CloseGroup as usize + 1
+            && lines.last().is_some_and(|line| {
+                let old = Shortcut::decode(line);
+                old == Shortcut::new('y', Modifiers::LOGO | Modifiers::SHIFT)
+                    || old == Shortcut::new('y', Modifiers::CTRL | Modifiers::SHIFT)
+            });
+        let line_count = lines.len() - usize::from(legacy_typewriter);
+        for (slot, line) in Slot::ALL
+            .into_iter()
+            .zip(lines.into_iter().take(line_count))
+        {
             if !line.is_empty() {
                 bindings.assign(slot, Shortcut::decode(line)?).ok()?;
             }

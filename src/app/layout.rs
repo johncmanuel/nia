@@ -38,8 +38,8 @@ impl App {
         };
         self.select_group(owner);
         let closed = self.tabs.remove(index);
-        if recovery::remove(&closed.recovery_key).is_err() {
-            log::warn!("recovery cleanup failed");
+        if let Err(error) = recovery::remove(&closed.recovery_key) {
+            log::warn!("recovery cleanup failed: {:?}", error.kind());
         }
         self.groups[self.active_group]
             .tabs
@@ -83,6 +83,10 @@ impl App {
     }
 
     pub(super) fn select_tab(&mut self, index: usize) {
+        if index != self.active {
+            self.current_mut().history.break_group();
+            self.tabs[index].history.break_group();
+        }
         let id = self.tabs[index].id;
         if let Some(group) = self
             .groups
@@ -161,6 +165,7 @@ impl App {
     }
 
     fn push_group_tab(&mut self, tab: Tab) {
+        self.current_mut().history.break_group();
         let id = tab.id;
         self.tabs.push(tab);
         let (panes, active_pane) = pane_grid::State::new(id);
@@ -187,6 +192,9 @@ impl App {
         let Some(target) = self.groups[index].inactive.take() else {
             return;
         };
+        if let Some(active) = self.tabs.get_mut(self.active) {
+            active.history.break_group();
+        }
         let previous = GroupLayout {
             panes: std::mem::replace(&mut self.panes, target.panes),
             active_pane: std::mem::replace(&mut self.active_pane, target.active_pane),
@@ -194,6 +202,9 @@ impl App {
         self.groups[self.active_group].inactive = Some(previous);
         self.active_group = index;
         self.activate_visible_tab();
+        if let Some(active) = self.tabs.get_mut(self.active) {
+            active.history.break_group();
+        }
     }
 
     pub(crate) fn group_label(&self, index: usize) -> String {

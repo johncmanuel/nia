@@ -60,7 +60,11 @@ pub(crate) fn save_file(path: &Path, contents: &str, expected: Option<&str>) -> 
         }
     })();
 
-    let _ = fs::remove_file(&temporary);
+    if let Err(error) = fs::remove_file(&temporary)
+        && error.kind() != ErrorKind::NotFound
+    {
+        log::warn!("temporary save file cleanup failed: {:?}", error.kind());
+    }
     result
 }
 

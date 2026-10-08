@@ -64,3 +64,45 @@ fn outline_shortcut_opens_and_closes_the_panel() {
         assert_eq!(app.show_outline, visible);
     }
 }
+
+#[test]
+fn long_outline_heading_stays_inside_the_panel() {
+    let mut app = blank();
+    let heading = "VeryLongHeadingWithoutSpaces".repeat(20);
+    let mut document = Document::new();
+    document.edit(format!("# {heading}"));
+    app.tabs[0] = Tab::new(0, document);
+    let _ = update(&mut app, Message::ShowOutline);
+
+    let mut ui = simulator(crate::ui::view(&app));
+    let filter = ui
+        .find(iced::widget::Id::new(OUTLINE))
+        .expect("outline filter visible")
+        .bounds();
+    let title = ui.find(heading.as_str()).expect("heading visible").bounds();
+    assert!(title.x + title.width <= filter.x + 240.0);
+    assert!(title.height > 20.0, "long heading should wrap");
+}
+
+#[test]
+fn escape_does_not_hide_outline_even_when_filter_has_focus() {
+    let mut app = blank();
+    let _ = update(&mut app, Message::ShowOutline);
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("Filter headings").expect("outline filter visible");
+    ui.simulate([iced_test::simulator::press_key(
+        Key::Named(iced::keyboard::key::Named::Escape),
+        None,
+    )]);
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    let _ = update(
+        &mut app,
+        Message::KeyPressed(
+            Key::Named(iced::keyboard::key::Named::Escape),
+            Modifiers::empty(),
+        ),
+    );
+    assert!(app.show_outline);
+}

@@ -58,13 +58,18 @@ pub(crate) fn update(state: &mut Desktop, message: Message) -> Task<Message> {
                     | app::Message::PaneResized(_)
                     | app::Message::CloseTab(_)
                     | app::Message::CloseCurrentTab
+                    | app::Message::CloseCurrentGroup
                     | app::Message::CloseRequested(_)
                     | app::Message::SaveAndClose
                     | app::Message::DiscardAndClose
             );
             let task = app::update(&mut state.editor, message);
-            if save_layout {
-                app::save_session(&state.editor);
+            if save_layout && let Err(error) = app::save_session(&state.editor) {
+                log::warn!("layout save failed: {:?}", error.kind());
+                state.editor.notice = Some(
+                    "Could not save the window layout. It may not be restored at the next start."
+                        .into(),
+                );
             }
             task.map(move |message| Message::Window(id, message))
         }
@@ -75,7 +80,10 @@ pub(crate) fn update(state: &mut Desktop, message: Message) -> Task<Message> {
             });
             Task::batch([window::gain_focus(id), startup])
         }
-        Message::WindowClosed(id) if id == state.window => iced::exit(),
+        Message::WindowClosed(id) if id == state.window => {
+            log::info!("window closed");
+            iced::exit()
+        }
         Message::Tick(now) => {
             let id = state.window;
             app::update(&mut state.editor, app::Message::Tick(now))
@@ -100,7 +108,7 @@ pub(crate) fn theme(state: &Desktop, _id: window::Id) -> Theme {
 pub(crate) fn style(state: &Desktop, theme: &Theme) -> iced::theme::Style {
     let mut style = iced::theme::default(theme);
     if state.editor.transparent_background {
-        style.background_color.a = 0.65;
+        style.background_color.a = f32::from(state.editor.background_opacity) / 100.0;
     }
     style
 }

@@ -4,7 +4,7 @@ use crate::focus::Dimming;
 use crate::keybindings::Slot;
 use iced::theme::Base;
 use iced::widget::{
-    button, checkbox, column, combo_box, container, pick_list, row, scrollable, space, text,
+    button, checkbox, column, combo_box, container, pick_list, row, scrollable, slider, space, text,
 };
 use iced::{Element, Length};
 
@@ -41,7 +41,17 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
             text("Show the desktop through the writing window (macOS and Linux).")
                 .size(12)
                 .style(muted_text),
-        )
+        );
+    if state.transparent_background {
+        rows = rows
+            .push(text(format!("Window opacity: {}%", state.background_opacity)).size(14))
+            .push(slider(
+                0..=100,
+                state.background_opacity,
+                Message::SetBackgroundOpacity,
+            ));
+    }
+    rows = rows
         .push(text("Font").size(18))
         .push(
             row![
@@ -111,6 +121,8 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
             rows = rows.push(text("Editor").size(18));
         } else if slot == Slot::Settings {
             rows = rows.push(text("App").size(18));
+        } else if slot == Slot::Bold {
+            rows = rows.push(text("Formatting").size(18));
         }
         let shortcut = if state.recording == Some(slot) {
             "Press keys...".into()
@@ -149,6 +161,20 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
             .style(footer_button)
             .on_press(Message::ResetKeybindings),
     );
+    rows = rows
+        .push(text("Open source credits").size(18))
+        .push(text("Iced - interface (MIT)").size(13).style(muted_text))
+        .push(text("rfd - file dialogs (MIT)").size(13).style(muted_text))
+        .push(
+            text("fontdb - installed fonts (MIT)")
+                .size(13)
+                .style(muted_text),
+        )
+        .push(
+            text("log - diagnostics (MIT or Apache-2.0)")
+                .size(13)
+                .style(muted_text),
+        );
 
     let centered = container(container(rows).width(Length::Fill).max_width(620))
         .width(Length::Fill)

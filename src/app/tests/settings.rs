@@ -40,6 +40,7 @@ fn settings_shortcut_opens_settings_from_editor() {
 #[test]
 fn settings_page_has_font_and_keybindings_controls() {
     let mut app = blank();
+    app.transparent_background = false;
     let mut ui = simulator(crate::ui::view(&app));
     ui.click("Settings").expect("settings control visible");
     for message in ui.into_messages() {
@@ -56,6 +57,12 @@ fn settings_page_has_font_and_keybindings_controls() {
     ui.find("Font").expect("font heading visible");
     ui.find("Monospace").expect("font reset visible");
     ui.find("Keybindings").expect("shortcuts visible");
+    ui.find("Open source credits")
+        .expect("credits visible in settings");
+    ui.find("Iced - interface (MIT)")
+        .expect("Iced credited in settings");
+    ui.find("log - diagnostics (MIT or Apache-2.0)")
+        .expect("logging library credited in settings");
     assert!(ui.find("Save document (alternate)").is_err());
     assert!(ui.find("Find in document (alternate)").is_err());
     ui.click("Transparent background")
@@ -64,6 +71,23 @@ fn settings_page_has_font_and_keybindings_controls() {
         ui.into_messages()
             .into_iter()
             .any(|message| matches!(message, Message::SetTransparentBackground(true)))
+    );
+    app.transparent_background = true;
+    let mut ui = simulator(crate::ui::view(&app));
+    let opacity_label = format!("Window opacity: {}%", app.background_opacity);
+    let label = ui
+        .find(opacity_label.as_str())
+        .expect("opacity control visible while transparency is enabled")
+        .bounds();
+    ui.point_at(iced::Point::new(
+        label.x + 40.0,
+        label.y + label.height + 24.0,
+    ));
+    ui.simulate(iced_test::simulator::click());
+    assert!(
+        ui.into_messages()
+            .into_iter()
+            .any(|message| matches!(message, Message::SetBackgroundOpacity(_)))
     );
 }
 

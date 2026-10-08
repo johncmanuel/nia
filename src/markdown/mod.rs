@@ -2,6 +2,33 @@ mod highlight;
 
 pub(crate) use highlight::{HighlightSettings, MarkdownHighlighter, format};
 
+pub(crate) fn standalone_images(contents: &str) -> Vec<(usize, String)> {
+    let mut images = Vec::new();
+    let mut fence = None;
+    for (line_number, line) in contents.lines().enumerate() {
+        if let Some(active) = fence {
+            if closes_fence(line, active) {
+                fence = None;
+            }
+            continue;
+        }
+        if let Some(start) = fenced_start(line) {
+            fence = Some(start);
+            continue;
+        }
+        if !line.contains("![") {
+            continue;
+        }
+        let mut items = iced::widget::markdown::parse(line.trim());
+        if let (Some(iced::widget::markdown::Item::Image { url, .. }), None) =
+            (items.next(), items.next())
+        {
+            images.push((line_number, url.to_string()));
+        }
+    }
+    images
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Heading {
     pub(crate) level: usize,

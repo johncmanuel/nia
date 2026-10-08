@@ -30,6 +30,7 @@ fn window_style_uses_saved_transparency_choice() {
     let opaque = style(&desktop, &Theme::Dark);
     assert_eq!(opaque.background_color.a, 1.0);
     desktop.editor.transparent_background = true;
+    desktop.editor.background_opacity = 35;
     let transparent = style(&desktop, &Theme::Dark);
-    assert!(transparent.background_color.a < 1.0);
+    assert_eq!(transparent.background_color.a, 0.35);
 }

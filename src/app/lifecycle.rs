@@ -2,7 +2,8 @@ use super::{App, CloseTarget, EDITOR, Message, Tab, open_document};
 use crate::{recent, recovery};
 use iced::Task;
 use iced::widget::{operation, text_editor};
-use std::time::Duration;
+use std::io::ErrorKind;
+use std::time::{Duration, Instant};
 
 pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
     match message {
@@ -57,15 +58,14 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     state.notice = None;
                     if let Some(path) = state.current().document.path.clone() {
                         recent::remember(&mut state.recent, &path);
-                        if recent::save(&state.recent).is_err() {
-                            log::warn!("recent documents save failed");
+                        if let Err(error) = recent::save(&state.recent) {
+                            log::warn!("recent documents save failed: {:?}", error.kind());
                         }
                     }
                     log::info!("document opened");
                 }
                 Err(error) => {
-                    state.notice = Some(format!("Could not open file: {error}"));
-                    log::warn!("document open failed");
+                    state.notice = Some(error.open_notice());
                 }
             }
             if state.confirmed_close.is_some() {
@@ -115,43 +115,70 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             state.tabs[index].saving = false;
             match result {
                 Ok(()) => {
+                    let mut cleanup_notice = None;
                     state.tabs[index].sync_document();
                     state.tabs[index]
                         .document
                         .saved(path.clone(), revision, contents);
                     state.tabs[index].conflict = false;
                     state.tabs[index].last_checked = None;
+                    state.tabs[index].last_save_failure = None;
                     state.tabs[index].recovered_revision = revision;
-                    if recovery::remove(&state.tabs[index].recovery_key).is_err() {
-                        log::warn!("recovery cleanup failed");
+                    state.tabs[index].last_recovery_failure = None;
+                    if !state.tabs[index].document.dirty
+                        && let Err(error) = recovery::remove(&state.tabs[index].recovery_key)
+                    {
+                        log::warn!("recovery cleanup failed: {:?}", error.kind());
+                        cleanup_notice = Some(
+                            "Saved the document, but could not remove its recovery draft. An old draft may reopen at the next start."
+                                .into(),
+                        );
                     }
                     recent::remember(&mut state.recent, &path);
-                    if recent::save(&state.recent).is_err() {
-                        log::warn!("recent documents save failed");
+                    if let Err(error) = recent::save(&state.recent) {
+                        log::warn!("recent documents save failed: {:?}", error.kind());
                     }
-                    state.notice = None;
+                    state.notice = cleanup_notice;
                     log::info!("document saved");
                     if state.confirmed_close.is_some() {
                         return state.continue_close();
                     }
                 }
                 Err(error) => {
-                    state.tabs[index].last_edit = None;
+                    let now = Instant::now();
+                    state.tabs[index].last_edit = Some(now);
+                    state.tabs[index].last_save_failure = Some(now);
                     state.confirmed_close = None;
-                    state.notice = Some(format!("Could not save file: {error}"));
-                    log::warn!("document save failed");
+                    if state.tabs[index].document.path.as_ref() == Some(&path)
+                        && matches!(error.kind, ErrorKind::AlreadyExists | ErrorKind::NotFound)
+                    {
+                        state.tabs[index].conflict = true;
+                    }
+                    state.notice = Some(error.save_notice());
                 }
             }
         }
         Message::RecoveryWritten(id, revision, result) => {
             if let Some(tab) = state.tabs.iter_mut().find(|tab| tab.id == id) {
                 tab.recovering = false;
-                tab.recovered_revision = revision;
-                if result.is_err() {
-                    log::warn!("recovery snapshot failed");
-                    state.notice = Some("Could not write a local recovery draft.".into());
-                } else if !tab.document.dirty && recovery::remove(&tab.recovery_key).is_err() {
-                    log::warn!("recovery cleanup failed");
+                match result {
+                    Ok(()) => {
+                        tab.recovered_revision = revision;
+                        tab.last_recovery_failure = None;
+                        if !tab.document.dirty
+                            && let Err(error) = recovery::remove(&tab.recovery_key)
+                        {
+                            log::warn!("recovery cleanup failed: {:?}", error.kind());
+                            state.notice = Some(
+                                "Could not remove an old recovery draft. It may reopen at the next start."
+                                    .into(),
+                            );
+                        }
+                    }
+                    Err(error) => {
+                        tab.last_recovery_failure = Some(Instant::now());
+                        state.notice = Some(error.recovery_notice().into());
+                    }
                 }
             }
             if state.confirmed_close.is_some() {
@@ -178,6 +205,8 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     } else {
                         tab.document.reload(contents);
                         tab.editor = text_editor::Content::with_text(&tab.document.contents);
+                        tab.history.clear();
+                        tab.rebuild_image_blocks();
                         tab.refresh_reading();
                         tab.conflict = false;
                         if state.show_search && state.search_all_tabs {
@@ -196,11 +225,12 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     }
                     tab.conflict = false;
                 }
-                Err(_) => {
+                Err(error) => {
+                    if !tab.conflict {
+                        log::warn!("external document check failed");
+                    }
                     tab.conflict = true;
-                    state.notice =
-                        Some("File is unavailable. Use Save As to keep your edits.".into());
-                    log::warn!("external document check failed");
+                    state.notice = Some(error.external_notice().into());
                 }
             }
         }
@@ -212,6 +242,9 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 tab.document.dirty
                     && !tab.recovering
                     && tab.recovered_revision != tab.document.revision
+                    && tab.last_recovery_failure.is_none_or(|failure| {
+                        now.saturating_duration_since(failure) >= Duration::from_secs(5)
+                    })
                     && tab
                         .last_edit
                         .is_some_and(|last| now.duration_since(last) >= Duration::from_millis(500))
@@ -219,32 +252,40 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 tab.sync_document();
                 if tab.document.dirty {
                     tab.recovering = true;
+                    log::debug!("recovery snapshot queued");
                     let id = tab.id;
                     let revision = tab.document.revision;
                     let key = tab.recovery_key.clone();
                     let contents = tab.document.contents.clone();
                     return Task::perform(
                         async move {
-                            recovery::write(&key, &contents).map_err(|error| error.to_string())
+                            recovery::write(&key, &contents).map_err(|error| {
+                                log::warn!("recovery snapshot failed: {:?}", error.kind());
+                                error.into()
+                            })
                         },
                         move |result| Message::RecoveryWritten(id, revision, result),
                     );
                 }
                 tab.recovered_revision = tab.document.revision;
-                if recovery::remove(&tab.recovery_key).is_err() {
-                    log::warn!("recovery cleanup failed");
+                if let Err(error) = recovery::remove(&tab.recovery_key) {
+                    log::warn!("recovery cleanup failed: {:?}", error.kind());
                 }
             }
             if let Some(index) = state.tabs.iter().position(|tab| {
                 tab.document.dirty
                     && !tab.saving
                     && !tab.conflict
+                    && tab.last_save_failure.is_none_or(|failure| {
+                        now.saturating_duration_since(failure) >= Duration::from_secs(5)
+                    })
                     && tab.document.path.is_some()
                     && tab
                         .last_edit
                         .is_some_and(|last| now.duration_since(last) >= Duration::from_millis(800))
             }) && let Some(path) = state.tabs[index].document.path.clone()
             {
+                log::debug!("autosave queued");
                 return state.start_save_at(index, path, false);
             }
             if let Some(tab) = state.tabs.iter_mut().find(|tab| {
@@ -262,7 +303,12 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 if let Some(path) = tab.document.path.clone() {
                     let checked_path = path.clone();
                     return Task::perform(
-                        async move { std::fs::read_to_string(path).map_err(|error| error.to_string()) },
+                        async move {
+                            std::fs::read_to_string(path).map_err(|error| {
+                                log::debug!("external document check failed: {:?}", error.kind());
+                                error.into()
+                            })
+                        },
                         move |result| Message::ExternalChecked(id, checked_path, revision, result),
                     );
                 }

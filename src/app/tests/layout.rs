@@ -119,6 +119,38 @@ fn command_t_opens_a_group_with_its_own_layout_and_compact_bar() {
 }
 
 #[test]
+fn long_group_title_does_not_overlap_next_tab() {
+    let mut app = blank();
+    app.tabs[0].document.path = Some(PathBuf::from(
+        "a_document_name_that_is_much_too_long_for_a_narrow_group_tab.md",
+    ));
+    for _ in 0..8 {
+        let _ = update(&mut app, Message::NewGroup);
+    }
+    let mut ui = iced_test::Simulator::with_size(
+        iced::Settings::default(),
+        iced::Size::new(700.0, 500.0),
+        crate::ui::view(&app),
+    );
+    let title = format!(
+        "1  {}...",
+        "a_document_name_that_is_much_too_long_for_a_narrow_group_tab.md"
+            .chars()
+            .take(24)
+            .collect::<String>()
+    );
+    let first = ui
+        .find(title.as_str())
+        .expect("long first group tab")
+        .bounds();
+    let second = ui.find("2  Untitled").expect("next group tab").bounds();
+    assert!(
+        first.x + first.width <= second.x,
+        "group title overlaps next tab"
+    );
+}
+
+#[test]
 fn split_panes_show_and_edit_separate_documents() {
     let mut app = blank();
     app.keybindings = crate::keybindings::Keybindings::default();

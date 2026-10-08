@@ -13,6 +13,7 @@ impl App {
         if self.current().conflict {
             self.confirmed_close = None;
             self.notice = Some("File changed on disk. Use Save As to keep your edits.".into());
+            log::warn!("save refused: external file conflict");
             return Task::none();
         }
         if let Some(path) = self.current().document.path.clone() {
@@ -55,7 +56,10 @@ impl App {
         Task::perform(
             async move {
                 save_file(&save_path, &contents, expected.as_deref())
-                    .map_err(|error| error.to_string())
+                    .map_err(|error| {
+                        log::warn!("document save failed: {:?}", error.kind());
+                        error.into()
+                    })
                     .map(|()| contents)
             },
             move |result| match result {
@@ -85,6 +89,12 @@ impl App {
                 .tabs
                 .iter()
                 .position(|tab| tab.id == id && tab.document.dirty),
+            CloseTarget::Group(anchor) => {
+                let ids = self.group_tab_ids(anchor);
+                self.tabs
+                    .iter()
+                    .position(|tab| ids.contains(&tab.id) && tab.document.dirty)
+            }
             CloseTarget::Window(_) => self.tabs.iter().position(|tab| tab.document.dirty),
         };
         if let Some(index) = dirty {
@@ -100,6 +110,7 @@ impl App {
                 }
                 Task::none()
             }
+            CloseTarget::Group(anchor) => self.close_group(anchor),
             CloseTarget::Window(id) => window::close(id),
         }
     }
@@ -120,6 +131,14 @@ impl App {
                 .position(|tab| tab.id == id)
                 .into_iter()
                 .collect(),
+            CloseTarget::Group(anchor) => {
+                let ids = self.group_tab_ids(anchor);
+                self.tabs
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, tab)| ids.contains(&tab.id).then_some(index))
+                    .collect()
+            }
             CloseTarget::Window(_) => (0..self.tabs.len()).collect(),
         };
         if indexes
@@ -135,7 +154,7 @@ impl App {
                 && let Err(error) = recovery::remove(&self.tabs[index].recovery_key)
             {
                 self.notice = Some(format!("Could not remove recovery draft: {error}"));
-                log::warn!("recovery cleanup failed");
+                log::warn!("recovery cleanup failed: {:?}", error.kind());
                 return Task::none();
             }
         }
@@ -149,7 +168,24 @@ impl App {
                 }
                 Task::none()
             }
+            CloseTarget::Group(anchor) => self.close_group(anchor),
             CloseTarget::Window(id) => window::close(id),
         }
+    }
+
+    fn group_tab_ids(&self, anchor: u64) -> Vec<u64> {
+        self.groups
+            .iter()
+            .find(|group| group.tabs.contains(&anchor))
+            .map_or_else(Vec::new, |group| group.tabs.clone())
+    }
+
+    fn close_group(&mut self, anchor: u64) -> Task<Message> {
+        for id in self.group_tab_ids(anchor) {
+            if let Some(index) = self.tabs.iter().position(|tab| tab.id == id) {
+                self.remove_tab(index);
+            }
+        }
+        operation::focus(EDITOR)
     }
 }

@@ -1,7 +1,10 @@
-use super::{App, CloseTarget, EDITOR, Message, Tab, keyboard, lifecycle, overlays, preferences};
+use super::{
+    App, CloseTarget, EDITOR, Message, Tab, formatting, image_blocks, keyboard, lifecycle,
+    overlays, preferences,
+};
 use crate::document::Document;
 use iced::Task;
-use iced::widget::{operation, pane_grid};
+use iced::widget::{operation, pane_grid, text_editor};
 use std::time::Instant;
 
 pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
@@ -13,14 +16,47 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
                 return Task::none();
             };
+            if index != state.active {
+                state.current_mut().history.break_group();
+                state.tabs[index].history.break_group();
+            }
             state.active = index;
             if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
                 state.active_pane = pane;
             }
             let tab = state.current_mut();
-            let changed = action.is_edit();
-            tab.editor.perform(action);
+            let pending = tab.history.begin(&tab.editor, &action);
+            let had_image_blocks = !tab.image_blocks.is_empty();
+            let auto = formatting::auto_edit(&tab.editor, &action);
+            let skipped_image_close = matches!(auto, Some(formatting::AutoEdit::SkipCloser))
+                && matches!(
+                    action,
+                    text_editor::Action::Edit(text_editor::Edit::Insert(')'))
+                );
+            let changed = if let Some(auto) = auto {
+                auto.perform(|action| tab.editor.perform(action))
+            } else {
+                tab.editor.perform(action.clone());
+                action.is_edit()
+            };
+            let image_structure = image_blocks::changes_image_structure(&action);
+            let pasted_image = matches!(&action, text_editor::Action::Edit(text_editor::Edit::Paste(text)) if text.contains("!["));
+            if skipped_image_close {
+                tab.rebuild_image_blocks();
+            }
             if changed {
+                tab.history.finish(&tab.editor, pending);
+                let line = tab.editor.cursor().position.line;
+                if image_structure
+                    && (pasted_image
+                        || [line, line.saturating_sub(1)].into_iter().any(|line| {
+                            tab.editor
+                                .line(line)
+                                .is_some_and(|line| line.text.contains("!["))
+                        }))
+                {
+                    tab.rebuild_image_blocks();
+                }
                 tab.refresh_reading();
                 tab.document.mark_edited();
                 tab.last_edit = Some(Instant::now());
@@ -31,8 +67,85 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 }
                 state.search_index = None;
                 state.notice = None;
+                state.show_format_menu = false;
+            }
+            if had_image_blocks != !state.current().image_blocks.is_empty() {
+                return operation::focus(EDITOR);
             }
         }
+        Message::EditImageBlock(id, block, action) => {
+            if state.loading || state.dialog_open {
+                return Task::none();
+            }
+            let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
+                return Task::none();
+            };
+            if index != state.active {
+                state.current_mut().history.break_group();
+                state.tabs[index].history.break_group();
+            }
+            state.active = index;
+            if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
+                state.active_pane = pane;
+            }
+            state.current_mut().activate_image_block(block);
+            let tab = state.current_mut();
+            let pending = tab.history.begin(&tab.editor, &action);
+            let auto = state
+                .current()
+                .image_blocks
+                .get(block)
+                .and_then(|image| formatting::auto_edit(&image.content, &action));
+            let changed = if let Some(auto) = auto {
+                auto.perform(|action| {
+                    state.current_mut().perform_image_action(block, action);
+                })
+            } else {
+                state
+                    .current_mut()
+                    .perform_image_action(block, action.clone())
+            };
+            let moved_block = state.current().active_image_block != block;
+            let removed_image_blocks = state.current().image_blocks.is_empty();
+            if changed {
+                let tab = state.current_mut();
+                tab.history.finish(&tab.editor, pending);
+                tab.refresh_reading();
+                tab.document.mark_edited();
+                tab.last_edit = Some(Instant::now());
+                if state.show_search && state.search_all_tabs {
+                    state.refresh_tab_search();
+                } else {
+                    state.refresh_search();
+                }
+                state.search_index = None;
+                state.notice = None;
+                state.show_format_menu = false;
+            }
+            if moved_block
+                || removed_image_blocks
+                || matches!(action, text_editor::Action::Click(_))
+            {
+                return operation::focus(EDITOR);
+            }
+        }
+        Message::ActivateImageBlock(id, block) => {
+            let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
+                return Task::none();
+            };
+            state.active = index;
+            if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
+                state.active_pane = pane;
+            }
+            state.current_mut().history.break_group();
+            state.current_mut().activate_image_block(block);
+            return operation::focus(EDITOR);
+        }
+        Message::ToggleFormatMenu => {
+            state.show_format_menu = !state.show_format_menu;
+        }
+        Message::Format(format) => return formatting::insert(state, format),
+        Message::Undo | Message::Redo => return restore_edit(state, message),
         Message::New => {
             if state.dialog_open {
                 return Task::none();
@@ -88,6 +201,36 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             let active = state.active;
             return update(state, Message::CloseTab(active));
         }
+        Message::CloseCurrentGroup => {
+            if state.loading
+                || state.dialog_open
+                || state.pending_close.is_some()
+                || state.confirmed_close.is_some()
+            {
+                return Task::none();
+            }
+            let ids = state.groups[state.active_group].tabs.clone();
+            for tab in &mut state.tabs {
+                if ids.contains(&tab.id) {
+                    tab.sync_document();
+                }
+            }
+            let Some(&anchor) = ids.first() else {
+                return Task::none();
+            };
+            let target = CloseTarget::Group(anchor);
+            if state
+                .tabs
+                .iter()
+                .any(|tab| ids.contains(&tab.id) && tab.document.dirty)
+            {
+                log::debug!("group close requires unsaved-change confirmation");
+                state.pending_close = Some(target);
+                return Task::none();
+            }
+            state.confirmed_close = Some(target);
+            return state.continue_close();
+        }
         message @ (Message::NextPane | Message::PreviousPane) => {
             if let Some(pane) = state.neighbor_pane(matches!(message, Message::NextPane)) {
                 return update(state, Message::ActivatePane(pane));
@@ -98,6 +241,8 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 && let Some(index) = state.tabs.iter().position(|tab| tab.id == id)
             {
                 if pane != state.active_pane {
+                    state.current_mut().history.break_group();
+                    state.tabs[index].history.break_group();
                     state.clear_search();
                 }
                 state.active_pane = pane;
@@ -165,6 +310,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
         | Message::ResetKeybindings
         | Message::SetTheme(_)
         | Message::SetTransparentBackground(_)
+        | Message::SetBackgroundOpacity(_)
         | Message::ToggleThemePicker
         | Message::HideThemePicker
         | Message::SetFont(_)
@@ -202,4 +348,46 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
         | Message::OpenRecent(_)) => return overlays::handle(state, message),
     }
     Task::none()
+}
+
+fn restore_edit(state: &mut App, message: Message) -> Task<Message> {
+    if state.loading
+        || state.dialog_open
+        || state.pending_close.is_some()
+        || state.show_settings
+        || state.show_search
+        || state.show_recent
+        || state.handbook.is_some()
+    {
+        return Task::none();
+    }
+    let tab = state.current_mut();
+    let restored = match message {
+        Message::Undo => tab.history.undo(&mut tab.editor),
+        Message::Redo => tab.history.redo(&mut tab.editor),
+        _ => return Task::none(),
+    };
+    if !restored {
+        return Task::none();
+    }
+    tab.rebuild_image_blocks();
+    tab.refresh_reading();
+    tab.document.mark_edited();
+    tab.sync_document();
+    tab.last_edit = tab.document.dirty.then(Instant::now);
+    if !tab.document.dirty {
+        tab.recovered_revision = tab.document.revision;
+        if let Err(error) = crate::recovery::remove(&tab.recovery_key) {
+            log::warn!("recovery cleanup after undo failed: {:?}", error.kind());
+        }
+    }
+    if state.show_search && state.search_all_tabs {
+        state.refresh_tab_search();
+    } else {
+        state.refresh_search();
+    }
+    state.search_index = None;
+    state.notice = None;
+    state.show_format_menu = false;
+    operation::focus(EDITOR)
 }

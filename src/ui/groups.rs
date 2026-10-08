@@ -21,24 +21,30 @@ pub(super) fn view(state: &App) -> Element<'_, Message> {
             continue;
         };
         tabs = tabs.push(
-            button(text(label).size(11).wrapping(text::Wrapping::None))
-                .width(Length::FillPortion(1))
-                .padding([5, 8])
-                .style(move |theme, status| {
-                    let mut style = button::text(theme, status);
-                    style.text_color =
-                        theme
-                            .palette()
-                            .text
-                            .scale_alpha(if active { 0.85 } else { 0.5 });
-                    if active {
-                        style.background = Some(Background::Color(
-                            theme.extended_palette().background.weak.color,
-                        ));
-                    }
-                    style
-                })
-                .on_press(Message::SelectTab(tab_index)),
+            button(
+                text(label)
+                    .size(11)
+                    .width(Length::Fill)
+                    .wrapping(text::Wrapping::None),
+            )
+            .width(Length::FillPortion(1))
+            .clip(true)
+            .padding([5, 8])
+            .style(move |theme, status| {
+                let mut style = button::text(theme, status);
+                style.text_color =
+                    theme
+                        .palette()
+                        .text
+                        .scale_alpha(if active { 0.85 } else { 0.5 });
+                if active {
+                    style.background = Some(Background::Color(
+                        theme.extended_palette().background.weak.color,
+                    ));
+                }
+                style
+            })
+            .on_press(Message::SelectTab(tab_index)),
         );
     }
     tabs = tabs.push(

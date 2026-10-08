@@ -6,6 +6,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::ShowSettings => {
             state.handbook = None;
+            state.show_format_menu = false;
             state.show_settings = true;
             state.show_theme_picker = false;
             state.recording = None;
@@ -14,6 +15,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         }
         Message::ShowHandbook => {
             state.show_settings = false;
+            state.show_format_menu = false;
             state.clear_search();
             state.handbook = Some(iced::widget::markdown::Content::parse(include_str!(
                 "../../HANDBOOK.md"
@@ -34,8 +36,10 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         }
         Message::ToggleReading => {
             state.show_settings = false;
+            state.show_format_menu = false;
             if state.current().reading.is_some() {
                 state.current_mut().reading = None;
+                log::debug!("reading mode closed");
                 return operation::focus(EDITOR);
             }
             state.clear_search();
@@ -43,6 +47,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             let content =
                 iced::widget::markdown::Content::parse(&state.current().document.contents);
             state.current_mut().reading = Some(content);
+            log::debug!("reading mode opened");
         }
         Message::CopyLink(url) => {
             state.notice = Some("Link copied".into());
@@ -50,11 +55,20 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         }
         Message::ShowSearch | Message::ShowTabSearch => {
             state.current_mut().reading = None;
+            state.show_format_menu = false;
             state.show_settings = false;
             state.show_recent = false;
             state.show_search = true;
             state.search_all_tabs = matches!(message, Message::ShowTabSearch);
             state.search_index = None;
+            log::debug!(
+                "search opened: scope={}",
+                if state.search_all_tabs {
+                    "all-tabs"
+                } else {
+                    "document"
+                }
+            );
             if state.search_all_tabs {
                 state.refresh_tab_search();
             } else {
@@ -162,7 +176,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             if let Some(heading) = state.outline_items().get(index) {
                 let line = heading.line;
                 state.current_mut().reading = None;
-                state.current_mut().editor.move_to(text_editor::Cursor {
+                state.current_mut().move_image_cursor(text_editor::Cursor {
                     position: text_editor::Position { line, column: 0 },
                     selection: None,
                 });

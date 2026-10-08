@@ -60,11 +60,18 @@ fn transparency_setting_defaults_and_round_trips() -> io::Result<()> {
             .as_nanos()
     ));
     let result = (|| {
-        assert!(!load_transparency_from(&path)?);
-        save_transparency_to(&path, true)?;
-        assert!(load_transparency_from(&path)?);
-        save_transparency_to(&path, false)?;
-        assert!(!load_transparency_from(&path)?);
+        assert_eq!(load_transparency_from(&path)?, (false, DEFAULT_OPACITY));
+        fs::write(&path, "true")?;
+        assert_eq!(load_transparency_from(&path)?, (true, DEFAULT_OPACITY));
+        save_transparency_to(&path, true, 25)?;
+        assert_eq!(load_transparency_from(&path)?, (true, 25));
+        save_transparency_to(&path, false, 100)?;
+        assert_eq!(load_transparency_from(&path)?, (false, 100));
+        fs::write(&path, "true\n101")?;
+        assert_eq!(
+            load_transparency_from(&path).unwrap_err().kind(),
+            ErrorKind::InvalidData
+        );
         fs::write(&path, "maybe")?;
         assert_eq!(
             load_transparency_from(&path).unwrap_err().kind(),

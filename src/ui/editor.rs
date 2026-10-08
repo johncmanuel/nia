@@ -1,6 +1,6 @@
 use crate::app::{App, EDITOR, Message, RECENT, Tab};
 use crate::markdown::{self, HighlightSettings, MarkdownHighlighter};
-use crate::ui::reading::reading_view;
+use crate::ui::{images, reading::reading_view};
 use iced::widget::{
     button, column, container, pane_grid, row, scrollable, space, text, text_editor, text_input,
 };
@@ -56,6 +56,8 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
 
     let writing_area: Element<'_, Message> = if tab.reading.is_some() {
         reading_view(state, tab)
+    } else if !tab.image_blocks.is_empty() {
+        images::writing_view(state, tab, active)
     } else {
         container(editor)
             .width(Length::Fill)

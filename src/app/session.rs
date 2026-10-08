@@ -19,11 +19,9 @@ struct SavedGroup {
     layout: Configuration<u64>,
 }
 
-pub(crate) fn save_session(app: &App) {
-    let result = config::directory().and_then(|dir| save_to(app, &dir.join("layout.conf")));
-    if let Err(error) = result {
-        log::warn!("layout save failed: {error}");
-    }
+pub(crate) fn save_session(app: &App) -> io::Result<()> {
+    let directory = config::directory()?;
+    save_to(app, &directory.join("layout.conf"))
 }
 
 pub(super) fn load() -> io::Result<Option<Session>> {
@@ -250,8 +248,9 @@ pub(super) fn restore(app: &mut App, session: Session) {
             let document = match path {
                 Some(path) => match Document::open(path) {
                     Ok(document) => document,
-                    Err(_) => {
+                    Err(error) => {
                         missing = true;
+                        log::warn!("saved document could not reopen: {:?}", error.kind());
                         Document::new()
                     }
                 },

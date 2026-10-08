@@ -1,4 +1,5 @@
 use crate::app::{App, Message, OUTLINE};
+use iced::widget::text::Wrapping;
 use iced::widget::{button, column, container, row, scrollable, space, text, text_input};
 use iced::{Element, Length};
 
@@ -12,14 +13,19 @@ pub(super) fn panel(state: &App) -> Element<'_, Message> {
             heading.title
         );
         items = items.push(
-            button(text(label).size(13))
-                .style(if index == state.outline_index {
-                    button::secondary
-                } else {
-                    button::text
-                })
-                .width(Length::Fill)
-                .on_press(Message::JumpOutline(index)),
+            button(
+                text(label)
+                    .size(13)
+                    .width(Length::Fill)
+                    .wrapping(Wrapping::WordOrGlyph),
+            )
+            .style(if index == state.outline_index {
+                button::secondary
+            } else {
+                button::text
+            })
+            .width(Length::Fill)
+            .on_press(Message::JumpOutline(index)),
         );
     }
     if headings.is_empty() {

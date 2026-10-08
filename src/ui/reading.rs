@@ -56,7 +56,7 @@ impl<'a> markdown::Viewer<'a, Message> for Reader<'a> {
     }
 }
 
-fn local_image_path(document_path: Option<&Path>, url: &str) -> Option<PathBuf> {
+pub(super) fn local_image_path(document_path: Option<&Path>, url: &str) -> Option<PathBuf> {
     if url.starts_with("//") || url.contains("://") || url.starts_with("data:") {
         return None;
     }

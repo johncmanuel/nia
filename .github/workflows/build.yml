@@ -94,7 +94,7 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           BUILD_TARGET: ${{ matrix.target }}
-        run: cargo build --locked --release --target "$BUILD_TARGET"
+        run: cargo build --locked --release --no-default-features --target "$BUILD_TARGET"
       - name: Package native binary and checksum
         if: github.event_name != 'pull_request'
         env:

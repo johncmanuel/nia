@@ -38,8 +38,8 @@ impl App {
         };
         self.select_group(owner);
         let closed = self.tabs.remove(index);
-        if recovery::remove(&closed.recovery_key).is_err() {
-            log::warn!("recovery cleanup failed");
+        if let Err(error) = recovery::remove(&closed.recovery_key) {
+            log::warn!("recovery cleanup failed: {:?}", error.kind());
         }
         self.groups[self.active_group]
             .tabs

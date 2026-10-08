@@ -17,10 +17,9 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
                 state.active_pane = pane;
             }
-            let focus = state.focus;
             let tab = state.current_mut();
             let changed = action.is_edit();
-            tab.perform_editor_action(action, focus);
+            tab.editor.perform(action);
             if changed {
                 tab.refresh_reading();
                 tab.document.mark_edited();
@@ -38,10 +37,17 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             if state.dialog_open {
                 return Task::none();
             }
-            state.show_layout = false;
-            state.push_tab(Document::new());
-            log::info!("new document tab");
-            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+            state.push_group(Document::new());
+            log::info!("new document tab group");
+            return operation::focus(EDITOR);
+        }
+        Message::NewGroup => {
+            if state.dialog_open {
+                return Task::none();
+            }
+            state.push_group(Document::new());
+            log::info!("new tab group");
+            return operation::focus(EDITOR);
         }
         message @ (Message::Open
         | Message::OpenPicked(_)
@@ -64,23 +70,28 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 return Task::none();
             }
             state.select_tab(index);
-            state.show_layout = false;
             state.show_settings = false;
             state.clear_search();
             state.notice = None;
-            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+            return operation::focus(EDITOR);
+        }
+        Message::SelectGroup(index) => {
+            if state.dialog_open || index >= state.groups.len() {
+                return Task::none();
+            }
+            state.select_group(index);
+            state.show_settings = false;
+            state.clear_search();
+            return operation::focus(EDITOR);
         }
         Message::CloseCurrentTab => {
             let active = state.active;
             return update(state, Message::CloseTab(active));
         }
-        Message::NextTab => {
-            let next = (state.active + 1) % state.tabs.len();
-            return update(state, Message::SelectTab(next));
-        }
-        Message::PreviousTab => {
-            let previous = (state.active + state.tabs.len() - 1) % state.tabs.len();
-            return update(state, Message::SelectTab(previous));
+        message @ (Message::NextPane | Message::PreviousPane) => {
+            if let Some(pane) = state.neighbor_pane(matches!(message, Message::NextPane)) {
+                return update(state, Message::ActivatePane(pane));
+            }
         }
         Message::ActivatePane(pane) => {
             if let Some(&id) = state.panes.get(pane)
@@ -91,38 +102,24 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 }
                 state.active_pane = pane;
                 state.active = index;
+                return operation::focus(EDITOR);
             }
         }
         Message::SinglePane => {
-            state.show_layout = false;
             let (panes, pane) = pane_grid::State::new(state.current().id);
             state.panes = panes;
             state.active_pane = pane;
         }
         Message::SplitPane(axis) => {
-            state.show_layout = false;
-            let existing = state
-                .tabs
-                .iter()
-                .find(|tab| {
-                    !state
-                        .panes
-                        .iter()
-                        .any(|(_, visible_id)| *visible_id == tab.id)
-                })
-                .map(|tab| tab.id);
-            let id = existing.unwrap_or_else(|| state.next_id());
+            let id = state.next_id();
             if let Some((pane, _)) = state.panes.split(axis, state.active_pane, id) {
-                if existing.is_none() {
-                    state.tabs.push(Tab::new(id, Document::new()));
-                }
-                if let Some(index) = state.tabs.iter().position(|tab| tab.id == id) {
-                    state.active = index;
-                }
+                state.tabs.push(Tab::new(id, Document::new()));
+                state.groups[state.active_group].tabs.push(id);
+                state.active = state.tabs.len() - 1;
                 state.active_pane = pane;
                 state.clear_search();
                 log::info!("editor pane split");
-                return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+                return operation::focus(EDITOR);
             }
         }
         Message::ClosePane(pane) => {
@@ -133,12 +130,6 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 state.active_pane = sibling;
                 state.activate_visible_tab();
                 state.clear_search();
-            }
-        }
-        Message::ToggleLayout => {
-            state.show_layout = !state.show_layout;
-            if state.show_layout {
-                state.show_search = false;
             }
         }
         Message::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
@@ -168,11 +159,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
         }
         Message::KeyPressed(key, modifiers) => return keyboard::handle(state, key, modifiers),
         message @ (Message::ToggleZen
-        | Message::ToggleTypewriter
-        | Message::AlignTypewriter
         | Message::SetHighlightLine(_)
-        | Message::SetLinesAbove(_)
-        | Message::SetLinesBelow(_)
         | Message::SetDimming(_)
         | Message::RecordShortcut(_)
         | Message::ResetKeybindings
@@ -185,6 +172,8 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
         | Message::IncreaseFontSize
         | Message::DecreaseFontSize) => return preferences::handle(state, message),
         message @ (Message::ShowSettings
+        | Message::ShowHandbook
+        | Message::HideHandbook
         | Message::ShowEditor
         | Message::ToggleReading
         | Message::CopyLink(_)

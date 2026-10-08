@@ -23,12 +23,10 @@ pub(super) fn view(state: &App) -> Element<'_, Message> {
         "Read"
     };
     let actions = [
-        ("New", Message::New),
         ("Open", Message::Open),
         ("Save", Message::Save),
         ("Save As", Message::SaveAs),
         (reading_label, Message::ToggleReading),
-        ("Zen", Message::ToggleZen),
         ("Find", Message::ShowSearch),
         (
             "Outline",
@@ -39,6 +37,7 @@ pub(super) fn view(state: &App) -> Element<'_, Message> {
             },
         ),
         ("Recent", Message::ShowRecent),
+        ("Handbook", Message::ShowHandbook),
         ("Settings", Message::ShowSettings),
     ];
     let controls = actions

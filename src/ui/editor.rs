@@ -11,10 +11,6 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
     let highlight = HighlightSettings {
         font: state.editor_font,
         active_line: active.then_some(line),
-        context: (active && state.focus.typewriter).then_some((
-            line.saturating_sub(usize::from(state.focus.lines_above)),
-            line.saturating_add(usize::from(state.focus.lines_below)),
-        )),
         focus: active
             .then(|| crate::focus::active_span(&tab.editor, state.focus.dimming))
             .flatten(),
@@ -33,15 +29,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         .line_height(text::LineHeight::Relative(1.55))
         .wrapping(text::Wrapping::WordOrGlyph)
         .padding(0)
-        .height(if active && state.focus.typewriter {
-            Length::Fixed(
-                f32::from(state.editor_font_size)
-                    * 1.55
-                    * f32::from(state.focus.lines_above + state.focus.lines_below + 1),
-            )
-        } else {
-            Length::Fill
-        })
+        .height(Length::Fill)
         .style(|theme, status| {
             let mut style = text_editor::default(theme, status);
             let mut background = theme.palette().background;
@@ -81,7 +69,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         .width(Length::Fill)
         .max_width(760)
         .height(Length::Fill);
-    if tab.conflict && !state.zen_mode {
+    if tab.conflict {
         content = content.push(
             row![
                 text("File changed or is unavailable on disk. Your edits are still here.").size(12),
@@ -91,7 +79,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
             .align_y(iced::Alignment::Center),
         );
     }
-    if active && state.show_recent && !state.zen_mode {
+    if active && state.show_recent {
         let mut results = column![].spacing(2);
         for (index, path) in state.recent_items().iter().enumerate() {
             results = results.push(
@@ -126,9 +114,7 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
         .width(Length::Fill)
         .height(Length::Fill)
         .center_x(Length::Fill)
-        .padding(if state.zen_mode {
-            [64, 32]
-        } else if state.panes.len() > 1 {
+        .padding(if state.panes.len() > 1 {
             [24, 20]
         } else {
             [48, 32]

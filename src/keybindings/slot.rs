@@ -21,11 +21,10 @@ pub(crate) enum Slot {
     DecreaseFontSize,
     Settings,
     Zen,
-    Typewriter,
 }
 
 impl Slot {
-    pub(crate) const ALL: [Self; 21] = [
+    pub(crate) const ALL: [Self; 20] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -46,7 +45,6 @@ impl Slot {
         Self::DecreaseFontSize,
         Self::Settings,
         Self::Zen,
-        Self::Typewriter,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -59,10 +57,10 @@ impl Slot {
             Self::AlternateFind => "Find in document (alternate)",
             Self::Outline => "Document outline",
             Self::Recent => "Recent documents",
-            Self::NewTab => "New tab",
-            Self::CloseTab => "Close tab",
-            Self::NextTab => "Next tab",
-            Self::PreviousTab => "Previous tab",
+            Self::NewTab => "New tab group",
+            Self::CloseTab => "Close document",
+            Self::NextTab => "Next split",
+            Self::PreviousTab => "Previous split",
             Self::SinglePane => "Single pane",
             Self::SplitRight => "Split right",
             Self::SplitDown => "Split down",
@@ -71,7 +69,6 @@ impl Slot {
             Self::DecreaseFontSize => "Decrease editor font size",
             Self::Settings => "Open settings",
             Self::Zen => "Toggle Zen mode",
-            Self::Typewriter => "Toggle typewriter mode",
         }
     }
 }

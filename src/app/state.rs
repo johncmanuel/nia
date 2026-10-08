@@ -50,12 +50,7 @@ impl App {
     }
 
     pub(crate) fn title(&self) -> String {
-        let document = &self.current().document;
-        format!(
-            "{}{} - nia",
-            document.file_name(),
-            if document.dirty { " \u{2022}" } else { "" }
-        )
+        format!("{} - nia", self.current().document.file_name())
     }
 
     pub(crate) fn search_matches(&self) -> &[(text_editor::Position, text_editor::Position)] {
@@ -97,14 +92,10 @@ impl App {
 
     pub(super) fn jump_match(&mut self, index: usize) {
         if let Some((start, end)) = self.search_matches().get(index).copied() {
-            let focus = self.focus;
-            self.current_mut().move_editor_to(
-                text_editor::Cursor {
-                    position: end,
-                    selection: Some(start),
-                },
-                focus,
-            );
+            self.current_mut().editor.move_to(text_editor::Cursor {
+                position: end,
+                selection: Some(start),
+            });
             self.search_index = Some(index);
         }
     }

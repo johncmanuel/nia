@@ -47,6 +47,9 @@ pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Me
         if state.show_settings {
             return update(state, Message::ShowEditor);
         }
+        if state.handbook.is_some() {
+            return update(state, Message::HideHandbook);
+        }
         if state.zen_mode {
             return update(state, Message::ToggleZen);
         }
@@ -56,6 +59,8 @@ pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Me
         if state.show_recent {
             return update(state, Message::HideRecent);
         }
+    } else if state.handbook.is_some() {
+        return Task::none();
     } else if state.show_outline && key == Key::Named(Named::ArrowDown) {
         return update(state, Message::OutlineNext);
     } else if state.show_outline && key == Key::Named(Named::ArrowUp) {
@@ -72,7 +77,8 @@ pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Me
 
 fn shortcut_message(slot: Slot) -> Message {
     match slot {
-        Slot::New | Slot::NewTab => Message::New,
+        Slot::New => Message::New,
+        Slot::NewTab => Message::NewGroup,
         Slot::Open => Message::Open,
         Slot::Save | Slot::AlternateSave => Message::Save,
         Slot::Find | Slot::AlternateFind => Message::ShowSearch,
@@ -80,8 +86,8 @@ fn shortcut_message(slot: Slot) -> Message {
         Slot::Outline => Message::ShowOutline,
         Slot::Recent => Message::ShowRecent,
         Slot::CloseTab => Message::CloseCurrentTab,
-        Slot::NextTab => Message::NextTab,
-        Slot::PreviousTab => Message::PreviousTab,
+        Slot::NextTab => Message::NextPane,
+        Slot::PreviousTab => Message::PreviousPane,
         Slot::SinglePane => Message::SinglePane,
         Slot::SplitRight => Message::SplitPane(pane_grid::Axis::Vertical),
         Slot::SplitDown => Message::SplitPane(pane_grid::Axis::Horizontal),
@@ -89,7 +95,6 @@ fn shortcut_message(slot: Slot) -> Message {
         Slot::DecreaseFontSize => Message::DecreaseFontSize,
         Slot::Settings => Message::ShowSettings,
         Slot::Zen => Message::ToggleZen,
-        Slot::Typewriter => Message::ToggleTypewriter,
     }
 }
 
@@ -110,9 +115,9 @@ impl App {
         let number = value.parse::<usize>().ok()?;
         let index = match number {
             1..=8 => number - 1,
-            9 => self.tabs.len().checked_sub(1)?,
+            9 => self.groups.len().checked_sub(1)?,
             _ => return None,
         };
-        (index < self.tabs.len()).then_some(Message::SelectTab(index))
+        (index < self.groups.len()).then_some(Message::SelectGroup(index))
     }
 }

@@ -50,7 +50,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     {
                         state.tabs[0] = Tab::new(state.tabs[0].id, document);
                     } else {
-                        state.push_tab(document);
+                        state.push_group(document);
                     }
                     state.show_settings = false;
                     state.clear_search();

@@ -40,7 +40,33 @@ pub(crate) fn boot() -> (Desktop, Task<Message>) {
 pub(crate) fn update(state: &mut Desktop, message: Message) -> Task<Message> {
     match message {
         Message::Window(id, message) if id == state.window => {
-            app::update(&mut state.editor, message).map(move |message| Message::Window(id, message))
+            let save_layout = matches!(
+                message,
+                app::Message::New
+                    | app::Message::NewGroup
+                    | app::Message::Opened(Ok(_))
+                    | app::Message::Saved(.., Ok(()))
+                    | app::Message::SelectTab(_)
+                    | app::Message::SelectGroup(_)
+                    | app::Message::NextPane
+                    | app::Message::PreviousPane
+                    | app::Message::ActivatePane(_)
+                    | app::Message::SinglePane
+                    | app::Message::SplitPane(_)
+                    | app::Message::ClosePane(_)
+                    | app::Message::PaneDragged(_)
+                    | app::Message::PaneResized(_)
+                    | app::Message::CloseTab(_)
+                    | app::Message::CloseCurrentTab
+                    | app::Message::CloseRequested(_)
+                    | app::Message::SaveAndClose
+                    | app::Message::DiscardAndClose
+            );
+            let task = app::update(&mut state.editor, message);
+            if save_layout {
+                app::save_session(&state.editor);
+            }
+            task.map(move |message| Message::Window(id, message))
         }
         Message::WindowOpened(id) if id == state.window => {
             log::info!("window opened");

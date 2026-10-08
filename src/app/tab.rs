@@ -1,4 +1,4 @@
-use crate::{document::Document, focus, recovery};
+use crate::{document::Document, recovery};
 use iced::widget::{markdown, text_editor};
 use std::time::Instant;
 
@@ -6,7 +6,6 @@ pub(crate) struct Tab {
     pub(crate) id: u64,
     pub(crate) document: Document,
     pub(crate) editor: text_editor::Content,
-    pub(super) typewriter_aligned: bool,
     pub(crate) reading: Option<markdown::Content>,
     pub(crate) saving: bool,
     pub(crate) checking: bool,
@@ -25,7 +24,6 @@ impl Tab {
             id,
             document,
             editor,
-            typewriter_aligned: false,
             reading: None,
             saving: false,
             checking: false,
@@ -56,58 +54,5 @@ impl Tab {
         if self.reading.is_some() {
             self.reading = Some(markdown::Content::parse(&self.editor.text()));
         }
-    }
-
-    pub(super) fn align_typewriter(&mut self, lines_above: u8) {
-        if self.typewriter_aligned {
-            return;
-        }
-        let line = self.editor.cursor().position.line;
-        let scroll = line.saturating_sub(usize::from(lines_above));
-        if scroll > 0 {
-            self.editor.perform(text_editor::Action::Scroll {
-                lines: scroll.min(i32::MAX as usize) as i32,
-            });
-        }
-        self.typewriter_aligned = true;
-    }
-
-    fn follow_typewriter(&mut self, old_line: usize, focus: focus::Settings) {
-        if !focus.typewriter {
-            return;
-        }
-        if !self.typewriter_aligned {
-            self.align_typewriter(focus.lines_above);
-            return;
-        }
-        let new_line = self.editor.cursor().position.line;
-        let distance = new_line.abs_diff(old_line).min(i32::MAX as usize) as i32;
-        let lines = if new_line >= old_line {
-            distance
-        } else {
-            -distance
-        };
-        if lines != 0 {
-            self.editor.perform(text_editor::Action::Scroll { lines });
-        }
-    }
-
-    pub(super) fn perform_editor_action(
-        &mut self,
-        action: text_editor::Action,
-        focus: focus::Settings,
-    ) {
-        if focus.typewriter && matches!(action, text_editor::Action::Scroll { .. }) {
-            return;
-        }
-        let old_line = self.editor.cursor().position.line;
-        self.editor.perform(action);
-        self.follow_typewriter(old_line, focus);
-    }
-
-    pub(super) fn move_editor_to(&mut self, cursor: text_editor::Cursor, focus: focus::Settings) {
-        let old_line = self.editor.cursor().position.line;
-        self.editor.move_to(cursor);
-        self.follow_typewriter(old_line, focus);
     }
 }

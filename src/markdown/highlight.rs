@@ -16,14 +16,12 @@ pub(crate) enum Kind {
     Link,
     Current,
     Dim,
-    Hidden,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct HighlightSettings {
     pub(crate) font: Font,
     pub(crate) active_line: Option<usize>,
-    pub(crate) context: Option<(usize, usize)>,
     pub(crate) focus: Option<Span>,
     pub(crate) highlight_line: bool,
 }
@@ -49,7 +47,9 @@ impl text::Highlighter for MarkdownHighlighter {
         }
     }
     fn update(&mut self, settings: &HighlightSettings) {
-        let first = if self.settings.font != settings.font {
+        let first = if self.settings.font != settings.font
+            || self.settings.focus.is_some() != settings.focus.is_some()
+        {
             0
         } else {
             [self.settings.active_line, settings.active_line]
@@ -57,8 +57,6 @@ impl text::Highlighter for MarkdownHighlighter {
                 .flatten()
                 .chain(
                     [
-                        self.settings.context.map(|(start, _)| start),
-                        settings.context.map(|(start, _)| start),
                         self.settings.focus.map(|span| span.start.line),
                         settings.focus.map(|span| span.start.line),
                     ]
@@ -139,11 +137,6 @@ impl text::Highlighter for MarkdownHighlighter {
                 }
             }
         }
-        if let Some((start, end)) = self.settings.context
-            && (line_index < start || line_index > end)
-        {
-            ranges.push((0..line.len(), Kind::Hidden));
-        }
         self.fences_after.push(self.fence);
         ranges
             .into_iter()
@@ -186,12 +179,11 @@ fn inline_ranges(line: &str, mut index: usize) -> Vec<(Range<usize>, Kind)> {
 
 pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlighter::Format<Font> {
     let palette = theme.palette();
-    if matches!(kind, Kind::Current | Kind::Dim | Kind::Hidden) {
+    if matches!(kind, Kind::Current | Kind::Dim) {
         return highlighter::Format {
             color: Some(match kind {
                 Kind::Current => palette.primary,
                 Kind::Dim => palette.text.scale_alpha(0.25),
-                Kind::Hidden => palette.text.scale_alpha(0.0),
                 _ => unreachable!(),
             }),
             font: None,
@@ -204,7 +196,7 @@ pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlig
         Kind::Emphasis => (palette.text, font::Weight::Medium),
         Kind::Strong => (palette.text, font::Weight::Bold),
         Kind::Link => (palette.primary, font::Weight::Normal),
-        Kind::Current | Kind::Dim | Kind::Hidden => unreachable!(),
+        Kind::Current | Kind::Dim => unreachable!(),
     };
     highlighter::Format {
         color: Some(color),

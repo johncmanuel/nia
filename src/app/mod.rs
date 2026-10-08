@@ -14,11 +14,13 @@ mod overlays;
 mod preferences;
 mod save;
 mod search_tabs;
+mod session;
 mod startup;
 mod state;
 mod tab;
 mod update;
 
+pub(crate) use session::save_session;
 #[cfg(test)]
 pub(crate) use startup::blank;
 pub(crate) use startup::boot;
@@ -36,13 +38,15 @@ pub(crate) struct App {
     pub(crate) active: usize,
     pub(crate) panes: pane_grid::State<u64>,
     pub(crate) active_pane: pane_grid::Pane,
-    pub(crate) show_layout: bool,
+    pub(crate) groups: Vec<TabGroup>,
+    pub(crate) active_group: usize,
     next_id: u64,
     pub(crate) notice: Option<String>,
     pub(crate) loading: bool,
     pub(crate) dialog_open: bool,
     pub(crate) keybindings: Keybindings,
     pub(crate) show_settings: bool,
+    pub(crate) handbook: Option<iced::widget::markdown::Content>,
     pub(crate) zen_mode: bool,
     pub(crate) focus: focus::Settings,
     pub(crate) recording: Option<Slot>,
@@ -72,6 +76,17 @@ pub(crate) struct App {
     confirmed_close: Option<CloseTarget>,
 }
 
+pub(crate) struct TabGroup {
+    pub(crate) tabs: Vec<u64>,
+    // The active group keeps its layout in App.panes instead.
+    pub(crate) inactive: Option<GroupLayout>,
+}
+
+pub(crate) struct GroupLayout {
+    pub(crate) panes: pane_grid::State<u64>,
+    pub(crate) active_pane: pane_grid::Pane,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CloseTarget {
     Tab(u64),
@@ -82,6 +97,7 @@ pub(crate) enum CloseTarget {
 pub(crate) enum Message {
     Edit(u64, text_editor::Action),
     New,
+    NewGroup,
     Open,
     OpenPicked(Option<PathBuf>),
     Opened(Result<Document, String>),
@@ -99,25 +115,23 @@ pub(crate) enum Message {
     CancelClose,
     FileDropped(PathBuf),
     SelectTab(usize),
+    SelectGroup(usize),
     CloseCurrentTab,
-    NextTab,
-    PreviousTab,
+    NextPane,
+    PreviousPane,
     ActivatePane(pane_grid::Pane),
     SinglePane,
-    ToggleLayout,
     SplitPane(pane_grid::Axis),
     ClosePane(pane_grid::Pane),
     PaneDragged(pane_grid::DragEvent),
     PaneResized(pane_grid::ResizeEvent),
     CloseTab(usize),
     ShowSettings,
+    ShowHandbook,
+    HideHandbook,
     ShowEditor,
     ToggleZen,
-    ToggleTypewriter,
-    AlignTypewriter,
     SetHighlightLine(bool),
-    SetLinesAbove(u8),
-    SetLinesBelow(u8),
     SetDimming(focus::Dimming),
     ToggleReading,
     CopyLink(String),

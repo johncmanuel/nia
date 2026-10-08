@@ -38,17 +38,16 @@ impl Default for Keybindings {
                 Shortcut::new('p', Modifiers::COMMAND),
                 Shortcut::new('t', Modifiers::COMMAND),
                 Shortcut::new('w', Modifiers::COMMAND),
-                Shortcut::tab(Modifiers::CTRL),
-                Shortcut::tab(Modifiers::CTRL | Modifiers::SHIFT),
+                Shortcut::new(']', Modifiers::COMMAND),
+                Shortcut::new('[', Modifiers::COMMAND),
                 Shortcut::new('l', Modifiers::CTRL | Modifiers::SHIFT),
-                Shortcut::new('r', Modifiers::CTRL | Modifiers::SHIFT),
-                Shortcut::new('d', Modifiers::CTRL | Modifiers::SHIFT),
+                Shortcut::new('d', Modifiers::COMMAND),
+                Shortcut::new('d', Modifiers::COMMAND | Modifiers::SHIFT),
                 Shortcut::new('f', Modifiers::COMMAND | Modifiers::SHIFT),
                 Shortcut::new('+', Modifiers::COMMAND),
                 Shortcut::new('-', Modifiers::COMMAND),
                 Shortcut::new(',', Modifiers::COMMAND),
                 Shortcut::new('j', Modifiers::COMMAND | Modifiers::SHIFT),
-                Shortcut::new('y', Modifiers::COMMAND | Modifiers::SHIFT),
             ],
         }
     }
@@ -117,7 +116,8 @@ impl Keybindings {
 
     fn decode(contents: &str) -> Option<Self> {
         let lines: Vec<_> = contents.lines().collect();
-        if !(3..=Slot::ALL.len()).contains(&lines.len()) {
+        // Older files can have one final shortcut for the removed typewriter mode.
+        if !(3..=Slot::ALL.len() + 1).contains(&lines.len()) {
             return None;
         }
         let mut bindings = Self {
@@ -129,8 +129,44 @@ impl Keybindings {
                 bindings.assign(slot, Shortcut::decode(line)?).ok()?;
             }
         }
+        let defaults = Self::default();
+        for (slot, old, new) in [
+            (
+                Slot::NextTab,
+                Shortcut::tab(Modifiers::CTRL),
+                defaults.get(Slot::NextTab),
+            ),
+            (
+                Slot::PreviousTab,
+                Shortcut::tab(Modifiers::CTRL | Modifiers::SHIFT),
+                defaults.get(Slot::PreviousTab),
+            ),
+            (
+                Slot::SplitRight,
+                Shortcut::new('r', Modifiers::CTRL | Modifiers::SHIFT),
+                defaults.get(Slot::SplitRight),
+            ),
+            (
+                Slot::SplitDown,
+                Shortcut::new('d', Modifiers::CTRL | Modifiers::SHIFT),
+                defaults.get(Slot::SplitDown),
+            ),
+        ] {
+            if bindings.get(slot) == old
+                && new.is_some_and(|shortcut| !bindings.shortcuts.contains(&Some(shortcut)))
+            {
+                bindings.shortcuts[slot as usize] = new;
+            }
+        }
+        if cfg!(target_os = "macos")
+            && bindings.get(Slot::SplitRight)
+                == Shortcut::new('r', Modifiers::COMMAND | Modifiers::SHIFT)
+            && let Some(shortcut) = defaults.get(Slot::SplitRight)
+            && !bindings.shortcuts.contains(&Some(shortcut))
+        {
+            bindings.shortcuts[Slot::SplitRight as usize] = Some(shortcut);
+        }
         if line_count < Slot::ALL.len() {
-            let defaults = Self::default();
             if cfg!(target_os = "macos")
                 && line_count < 8
                 && bindings.get(Slot::Find) == Shortcut::new('f', Modifiers::CTRL)

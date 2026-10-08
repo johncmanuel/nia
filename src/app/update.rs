@@ -1,6 +1,6 @@
 use super::{
-    App, CloseTarget, EDITOR, Message, Tab, formatting, history::History, image_blocks, keyboard,
-    lifecycle, overlays, preferences,
+    App, CloseTarget, EDITOR, Message, Tab, formatting, image_blocks, keyboard, lifecycle,
+    overlays, preferences,
 };
 use crate::document::Document;
 use iced::Task;
@@ -16,12 +16,16 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
                 return Task::none();
             };
+            if index != state.active {
+                state.current_mut().history.break_group();
+                state.tabs[index].history.break_group();
+            }
             state.active = index;
             if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
                 state.active_pane = pane;
             }
             let tab = state.current_mut();
-            let pending = History::begin(&tab.editor, &action);
+            let pending = tab.history.begin(&tab.editor, &action);
             let had_image_blocks = !tab.image_blocks.is_empty();
             let auto = formatting::auto_edit(&tab.editor, &action);
             let skipped_image_close = matches!(auto, Some(formatting::AutoEdit::SkipCloser))
@@ -76,12 +80,17 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
                 return Task::none();
             };
+            if index != state.active {
+                state.current_mut().history.break_group();
+                state.tabs[index].history.break_group();
+            }
             state.active = index;
             if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
                 state.active_pane = pane;
             }
             state.current_mut().activate_image_block(block);
-            let pending = History::begin(&state.current().editor, &action);
+            let tab = state.current_mut();
+            let pending = tab.history.begin(&tab.editor, &action);
             let auto = state
                 .current()
                 .image_blocks
@@ -128,6 +137,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
                 state.active_pane = pane;
             }
+            state.current_mut().history.break_group();
             state.current_mut().activate_image_block(block);
             return operation::focus(EDITOR);
         }
@@ -231,6 +241,8 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 && let Some(index) = state.tabs.iter().position(|tab| tab.id == id)
             {
                 if pane != state.active_pane {
+                    state.current_mut().history.break_group();
+                    state.tabs[index].history.break_group();
                     state.clear_search();
                 }
                 state.active_pane = pane;

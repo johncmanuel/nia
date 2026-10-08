@@ -23,7 +23,7 @@ fn shortcuts_undo_and_redo_edits_in_active_document() {
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
-    assert_eq!(app.current().editor.text(), "h");
+    assert_eq!(app.current().editor.text(), "");
 
     let mut ui = simulator(crate::ui::view(&app));
     ui.click(iced::widget::Id::new(EDITOR))
@@ -71,11 +71,15 @@ fn image_block_edit_undo_restores_source_and_blocks() {
     let block = app.current().active_image_block;
     let _ = update(
         &mut app,
-        Message::EditImageBlock(0, block, Action::Edit(Edit::Insert('!'))),
+        Message::EditImageBlock(0, block, Action::Edit(Edit::Insert('X'))),
+    );
+    let _ = update(
+        &mut app,
+        Message::EditImageBlock(0, block, Action::Edit(Edit::Insert('Y'))),
     );
     assert_eq!(
         app.current().editor.text(),
-        "Before\n![photo](image.png)\nAfter!"
+        "Before\n![photo](image.png)\nAfterXY"
     );
     let _ = update(&mut app, Message::Undo);
     assert_eq!(
@@ -86,7 +90,7 @@ fn image_block_edit_undo_restores_source_and_blocks() {
     let _ = update(&mut app, Message::Redo);
     assert_eq!(
         app.current().editor.text(),
-        "Before\n![photo](image.png)\nAfter!"
+        "Before\n![photo](image.png)\nAfterXY"
     );
 }
 
@@ -99,4 +103,26 @@ fn auto_pair_is_one_undo_step() {
     assert_eq!(app.current().editor.text(), "");
     let _ = update(&mut app, Message::Redo);
     assert_eq!(app.current().editor.text(), "()");
+}
+
+#[test]
+fn formatting_and_tab_switches_break_typing_groups() {
+    let mut app = blank();
+    for character in "word".chars() {
+        let _ = update(
+            &mut app,
+            Message::Edit(0, Action::Edit(Edit::Insert(character))),
+        );
+    }
+    let _ = update(&mut app, Message::Format(super::Format::Bold));
+    assert_eq!(app.current().editor.text(), "word****");
+    let _ = update(&mut app, Message::Undo);
+    assert_eq!(app.current().editor.text(), "word");
+    let _ = update(&mut app, Message::New);
+    let _ = update(&mut app, Message::SelectGroup(0));
+    let _ = update(&mut app, Message::Edit(0, Action::Edit(Edit::Insert('!'))));
+    let _ = update(&mut app, Message::Undo);
+    assert_eq!(app.current().editor.text(), "word");
+    let _ = update(&mut app, Message::Undo);
+    assert_eq!(app.current().editor.text(), "");
 }

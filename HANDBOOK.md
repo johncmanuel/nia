@@ -35,7 +35,7 @@ Select text and press Primary+B to add bold markers or Primary+I to add italic m
 
 Type an opening parenthesis, bracket, brace, angle bracket, quote, apostrophe, or backtick to add its closing character. If you select text first, nia puts the pair around it. Type the closing character to move past it. Press Backspace between an empty pair to remove both characters.
 
-Press Primary+Z to undo an edit. Press Primary+Shift+Z to redo it. Each document keeps its most recent 1,000 edits in its own undo and redo history. The history is available until you close the document.
+Press Primary+Z to undo. Press Primary+Shift+Z to redo. nia groups nearby letters into word-sized undo steps. A space or punctuation ends the group. Pausing or moving the cursor also starts a new step. Pasting or adding Markdown with **Insert** is one step. Each document keeps its most recent 1,000 undo steps until you close it.
 
 Read mode shows common Markdown forms. Some extended forms, such as definition lists, emoji codes, highlights, subscripts, and superscripts, stay as source text in Read mode.
 

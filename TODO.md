@@ -1,15 +1,37 @@
 # TODO
 
+## Before release
+
 - [ ] Verify the first GitHub Actions build and tagged release on Linux, Windows, and both macOS architectures after pushing the workflow.
 - [ ] Verify that the first merge into `master` after the workflow update publishes a GitHub prerelease with four native archives and checksums.
-- [ ] Render Markdown images inline while writing. Read mode already displays local images.
+- [ ] On macOS, verify tab group switching and Primary+Shift+W group closing with clean and unsaved documents in multiple splits. Check save, discard, and cancel paths.
+- [ ] On macOS, verify pane dragging and resizing, restored groups and layouts after relaunch, long tab titles, and long outline headings. Check outline toggling by mouse and shortcut.
+- [ ] On macOS, verify inline image editing and large image previews in a narrow split. Check that images remain within the writing pane and that text around them is editable.
+- [ ] On macOS, verify typing responsiveness, all-tabs search, installed fonts, wallpaper transparency and opacity adjustment, and the F12 Iced debug overlay. Headless `iced_test` interactions pass.
+
+## Editor improvements
+
+- [ ] Support images inside a paragraph while writing. Standalone local image links now render between editable text blocks.
+- [ ] Support text selection across image blocks in the writing view. Each block currently has its own selection.
 - [ ] Hide Markdown syntax while writing and render formatted text inline, including heading markers (for example, hide `#` and enlarge the heading text). Read mode already renders formatted text.
+- [ ] Render extended Markdown forms that Iced's current Markdown viewer leaves as source text: footnotes, definition lists, emoji codes, highlights, subscripts, and superscripts.
+- [ ] Evaluate a faster text storage strategy using the plan below. Do not replace the editor's text representation before measurements identify a bottleneck.
+- [ ] Evaluate cross-process locking or an atomic conflict check for saving an open file. A file can change between the current comparison and rename.
 
 Read mode uses Iced's Markdown renderer and a custom image viewer. Inline formatting while typing still needs an editable rich surface with cursor mapping and Markdown source preservation.
 
 Synchronization from the design document remains deferred until requested.
 
-## Post project tasks
+## Text storage evaluation plan
 
-- [ ] After the project is finalized, build a static HTML, CSS, and JavaScript brochure website that demonstrates it. Add project files under site/
-- [ ] Verify tab group switching, pane dragging, pane resizing, restored group layouts after relaunch, typing responsiveness, all-tabs search, installed font rendering, wallpaper transparency, and the optional Iced debug overlay on an interactive macOS desktop. This executor cannot connect to the window service; headless `iced_test` interactions pass.
+**Current choice:** Keep Iced's `text_editor::Content` as the live editing buffer. Its underlying Cosmic Text buffer already stores a vector of lines. Iced does not accept a rope or piece table as a replacement for `Content`, so adding one now would duplicate the document and require full-text conversions. If a custom editing surface becomes necessary, prototype a **rope** first: it supports edits and line lookup together, which suits cursor movement, Markdown, and the outline. A piece table is the fallback to compare if undo history or edit memory becomes the measured bottleneck; fast line lookup needs an additional index or tree.
+
+1. Establish a baseline in a release build and with Iced's F12 debug view. For 1 MB, 10 MB, and 100 MB documents, measure p50/p95/p99 insertion, deletion, cursor navigation, full app update, and frame layout at the start, middle, and end. Include Unicode, very long lines, many short lines, and documents with image links. Record peak memory and allocations per edit. Treat typing latency as the first priority when evaluating tradeoffs.
+2. Attribute the time before changing storage. In particular, measure `Content::text()` and its per-line copies, `Document.contents` and `saved_contents`, `sync_document`, outline generation while its panel is open, all-tabs search, and image-block rebuilding. Measure save and recovery separately from typing.
+3. Remove only measured work on the hot path first, such as repeated full-text extraction or rebuilding derived views on every frame. Rerun the same workload and confirm cursor behavior, Markdown source, search, undo/redo, autosave, recovery, and memory use.
+4. If typing still misses the chosen frame budget, prototype a rope-backed editor behind a small benchmark, including byte/Unicode cursor mapping and line access. Compare it with the current Iced editor under identical workloads. Prototype a piece table only if the measurements indicate a meaningful advantage for this editor. Do not keep a second authoritative text buffer merely to introduce a new data structure.
+5. Migrate only when the end-to-end typing improvement outweighs the cost of replacing Iced's editor behavior. Record benchmark results and the decision here before implementation.
+
+## After the project is finalized
+
+- [ ] Build a static HTML, CSS, and JavaScript brochure website that demonstrates nia. Add project files under site/.

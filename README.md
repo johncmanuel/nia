@@ -6,7 +6,34 @@ Run `cargo run` for a blank document or `cargo run -- path/to/article.md` to ope
 
 ## Development
 
-`cargo test` runs headless `iced_test` interaction and rendering checks. Run `cargo run --features debug-tools` and press F12 to view Iced's debug metrics; a regular build leaves the debugger detached.
+`cargo test` runs headless `iced_test` interaction and rendering checks. Run `cargo run` and press F12 to view Iced's debug metrics. Use `NIA_LOG=debug cargo run` to see more diagnostic events on standard error. Production builds use `cargo build --release --no-default-features` to omit the debugger.
+
+### Environment variables
+
+The app reads these variables:
+
+| Variable | Use |
+| --- | --- |
+| `NIA_LOG=debug` | Print additional diagnostic events on standard error. Other values use the default log level. Document text is not logged. |
+| `HOME` | Find the settings directory on macOS; fallback on Linux. |
+| `XDG_CONFIG_HOME` | Find the settings directory on Linux when set. |
+| `APPDATA` | Find the settings directory on Windows. |
+
+Snapshot tests also read these variables. Set a snapshot variable to a writable PNG path before running its test.
+
+| Variable | Snapshot |
+| --- | --- |
+| `NIA_SNAPSHOT` | Main editor |
+| `NIA_LAYOUT_SNAPSHOT` | Split layout |
+| `NIA_LAYOUT_SNAPSHOT_THEME=light` | Use a light theme for the layout snapshot |
+| `NIA_GROUP_SNAPSHOT` | Tab groups |
+| `NIA_READING_SNAPSHOT` | Reading mode |
+| `NIA_IMAGE_SNAPSHOT` | Image in reading mode |
+| `NIA_INLINE_IMAGE_SNAPSHOT` | Image while writing |
+| `NIA_OPENED_SNAPSHOT` | Opened document |
+| `NIA_SETTINGS_SNAPSHOT` | Settings |
+| `NIA_THEME_SNAPSHOT` | Theme menu |
+| `NIA_ZEN_SNAPSHOT` | Zen mode |
 
 Before submitting changes, run:
 

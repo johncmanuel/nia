@@ -18,6 +18,7 @@ cargo test
     - Do not introduce new frameworks or architectural layers without a concrete need.
 - Since using the iced library for Rust GUI development, use iced_test to test and refine changes. 
 - if *.rs files become semantically large and it's feasible to break it up for better code maintainability and readability, do so.
+- Add any tests under tests.rs. If tests.rs becomes too bloated, add them as a file named after the logic it is testing and placed into tests/ under the appropiate directory (i.e. app/, config/, document/, etc. (all under src/))
 
 ## Iterating changes
 

@@ -17,6 +17,7 @@ fn defaults_use_the_operating_system_primary_modifier() {
         (Slot::Recent, "p", false),
         (Slot::NewTab, "t", false),
         (Slot::CloseTab, "w", false),
+        (Slot::CloseGroup, "w", true),
         (Slot::NextTab, "]", false),
         (Slot::PreviousTab, "[", false),
         (Slot::SplitRight, "d", false),
@@ -26,6 +27,10 @@ fn defaults_use_the_operating_system_primary_modifier() {
         (Slot::DecreaseFontSize, "-", false),
         (Slot::Settings, ",", false),
         (Slot::Zen, "j", true),
+        (Slot::Bold, "b", false),
+        (Slot::Italic, "i", false),
+        (Slot::Undo, "z", false),
+        (Slot::Redo, "z", true),
     ] {
         let modifiers = if shifted {
             primary | Modifiers::SHIFT
@@ -75,9 +80,50 @@ fn older_keybindings_gain_zen_shortcut() {
 }
 
 #[test]
+fn old_keybindings_gain_group_close_shortcut() {
+    let defaults = Keybindings::default();
+    let old = defaults
+        .encode()
+        .lines()
+        .take(Slot::CloseGroup as usize)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let restored = Keybindings::decode(&old).expect("previous keybindings file");
+    assert_eq!(
+        restored.get(Slot::CloseGroup),
+        defaults.get(Slot::CloseGroup)
+    );
+}
+
+#[test]
+fn old_keybindings_gain_format_shortcuts() {
+    let defaults = Keybindings::default();
+    let old = defaults
+        .encode()
+        .lines()
+        .take(Slot::Bold as usize)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let restored = Keybindings::decode(&old).expect("previous keybindings file");
+    assert_eq!(restored.get(Slot::Bold), defaults.get(Slot::Bold));
+    assert_eq!(restored.get(Slot::Italic), defaults.get(Slot::Italic));
+}
+
+#[test]
 fn old_typewriter_shortcut_is_ignored() {
     let defaults = Keybindings::default();
     let old = format!("{}meta+shift+y\n", defaults.encode());
+    assert_eq!(Keybindings::decode(&old), Some(defaults.clone()));
+
+    let old = format!(
+        "{}\nmeta+shift+y\n",
+        defaults
+            .encode()
+            .lines()
+            .take(Slot::CloseGroup as usize)
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
     assert_eq!(Keybindings::decode(&old), Some(defaults));
 }
 

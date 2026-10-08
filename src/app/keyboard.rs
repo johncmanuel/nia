@@ -1,8 +1,8 @@
-use super::{App, Message, update};
+use super::{App, Format, Message, update};
 use crate::keybindings::{Shortcut, Slot};
 use iced::Task;
 use iced::keyboard::{Key, Modifiers, key::Named};
-use iced::widget::pane_grid;
+use iced::widget::{operation, pane_grid};
 
 pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Message> {
     if state.pending_close.is_some() {
@@ -19,14 +19,10 @@ pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Me
             match state.keybindings.assign(slot, shortcut) {
                 Ok(()) => {
                     state.recording = None;
-                    state.notice = state
-                        .keybindings
-                        .save()
-                        .err()
-                        .map(|error| format!("Could not save keybindings: {error}"));
-                    if state.notice.is_some() {
-                        log::warn!("keybindings save failed");
-                    }
+                    state.notice = state.keybindings.save().err().map(|error| {
+                        log::warn!("keybindings save failed: {:?}", error.kind());
+                        format!("Could not save keybindings: {error}")
+                    });
                 }
                 Err(conflict) => {
                     state.notice = Some(format!(
@@ -44,6 +40,10 @@ pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Me
         if state.show_search {
             return update(state, Message::HideSearch);
         }
+        if state.show_format_menu {
+            state.show_format_menu = false;
+            return operation::focus(super::EDITOR);
+        }
         if state.show_settings {
             return update(state, Message::ShowEditor);
         }
@@ -52,9 +52,6 @@ pub(super) fn handle(state: &mut App, key: Key, modifiers: Modifiers) -> Task<Me
         }
         if state.zen_mode {
             return update(state, Message::ToggleZen);
-        }
-        if state.show_outline {
-            return update(state, Message::HideOutline);
         }
         if state.show_recent {
             return update(state, Message::HideRecent);
@@ -86,6 +83,7 @@ fn shortcut_message(slot: Slot) -> Message {
         Slot::Outline => Message::ShowOutline,
         Slot::Recent => Message::ShowRecent,
         Slot::CloseTab => Message::CloseCurrentTab,
+        Slot::CloseGroup => Message::CloseCurrentGroup,
         Slot::NextTab => Message::NextPane,
         Slot::PreviousTab => Message::PreviousPane,
         Slot::SinglePane => Message::SinglePane,
@@ -95,6 +93,10 @@ fn shortcut_message(slot: Slot) -> Message {
         Slot::DecreaseFontSize => Message::DecreaseFontSize,
         Slot::Settings => Message::ShowSettings,
         Slot::Zen => Message::ToggleZen,
+        Slot::Bold => Message::Format(Format::Bold),
+        Slot::Italic => Message::Format(Format::Italic),
+        Slot::Undo => Message::Undo,
+        Slot::Redo => Message::Redo,
     }
 }
 

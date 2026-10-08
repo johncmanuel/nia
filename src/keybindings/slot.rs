@@ -21,10 +21,15 @@ pub(crate) enum Slot {
     DecreaseFontSize,
     Settings,
     Zen,
+    CloseGroup,
+    Bold,
+    Italic,
+    Undo,
+    Redo,
 }
 
 impl Slot {
-    pub(crate) const ALL: [Self; 20] = [
+    pub(crate) const ALL: [Self; 25] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -45,6 +50,11 @@ impl Slot {
         Self::DecreaseFontSize,
         Self::Settings,
         Self::Zen,
+        Self::CloseGroup,
+        Self::Bold,
+        Self::Italic,
+        Self::Undo,
+        Self::Redo,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -69,6 +79,11 @@ impl Slot {
             Self::DecreaseFontSize => "Decrease editor font size",
             Self::Settings => "Open settings",
             Self::Zen => "Toggle Zen mode",
+            Self::CloseGroup => "Close tab group",
+            Self::Bold => "Bold text",
+            Self::Italic => "Italic text",
+            Self::Undo => "Undo edit",
+            Self::Redo => "Redo edit",
         }
     }
 }

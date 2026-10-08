@@ -5,8 +5,10 @@ use iced::{Element, Length, Theme};
 mod confirm;
 mod editor;
 mod footer;
+mod formatting;
 mod groups;
 mod handbook;
+mod images;
 mod navigation;
 mod outline;
 mod reading;
@@ -39,7 +41,16 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
         if state.groups.len() > 1 {
             page = column![groups::view(state), page].height(Length::Fill);
         }
+        if state.show_format_menu {
+            page = page.push(formatting::menu());
+        }
         page = page.push(footer::view(state));
+    } else if let Some(notice) = &state.notice {
+        page = page.push(
+            container(text(notice).size(12))
+                .width(Length::Fill)
+                .padding([8, 20]),
+        );
     }
     let page: Element<'_, Message> = page.width(Length::Fill).height(Length::Fill).into();
     if let Some(search) = navigation::search_bar(state) {

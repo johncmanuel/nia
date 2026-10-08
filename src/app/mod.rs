@@ -7,6 +7,10 @@ use iced::{Font, Theme, window};
 use std::path::PathBuf;
 use std::time::Instant;
 
+mod file_failure;
+mod formatting;
+mod history;
+mod image_blocks;
 mod keyboard;
 mod layout;
 mod lifecycle;
@@ -20,6 +24,9 @@ mod state;
 mod tab;
 mod update;
 
+use file_failure::FileFailure;
+pub(crate) use formatting::Format;
+use image_blocks::ImageBlock;
 pub(crate) use session::save_session;
 #[cfg(test)]
 pub(crate) use startup::blank;
@@ -46,12 +53,14 @@ pub(crate) struct App {
     pub(crate) dialog_open: bool,
     pub(crate) keybindings: Keybindings,
     pub(crate) show_settings: bool,
+    pub(crate) show_format_menu: bool,
     pub(crate) handbook: Option<iced::widget::markdown::Content>,
     pub(crate) zen_mode: bool,
     pub(crate) focus: focus::Settings,
     pub(crate) recording: Option<Slot>,
     pub(crate) theme: Theme,
     pub(crate) transparent_background: bool,
+    pub(crate) background_opacity: u8,
     pub(crate) show_theme_picker: bool,
     pub(crate) font_families: Vec<String>,
     pub(crate) font_options: combo_box::State<String>,
@@ -90,24 +99,31 @@ pub(crate) struct GroupLayout {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CloseTarget {
     Tab(u64),
+    Group(u64),
     Window(window::Id),
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum Message {
     Edit(u64, text_editor::Action),
+    EditImageBlock(u64, usize, text_editor::Action),
+    ActivateImageBlock(u64, usize),
+    ToggleFormatMenu,
+    Format(Format),
+    Undo,
+    Redo,
     New,
     NewGroup,
     Open,
     OpenPicked(Option<PathBuf>),
-    Opened(Result<Document, String>),
+    Opened(Result<Document, FileFailure>),
     Save,
     SavePicked(Option<PathBuf>),
     SaveAs,
     SaveAsPicked(Option<PathBuf>),
-    Saved(u64, PathBuf, u64, String, Result<(), String>),
-    RecoveryWritten(u64, u64, Result<(), String>),
-    ExternalChecked(u64, PathBuf, u64, Result<String, String>),
+    Saved(u64, PathBuf, u64, String, Result<(), FileFailure>),
+    RecoveryWritten(u64, u64, Result<(), FileFailure>),
+    ExternalChecked(u64, PathBuf, u64, Result<String, FileFailure>),
     Tick(Instant),
     CloseRequested(window::Id),
     SaveAndClose,
@@ -117,6 +133,7 @@ pub(crate) enum Message {
     SelectTab(usize),
     SelectGroup(usize),
     CloseCurrentTab,
+    CloseCurrentGroup,
     NextPane,
     PreviousPane,
     ActivatePane(pane_grid::Pane),
@@ -139,6 +156,7 @@ pub(crate) enum Message {
     ResetKeybindings,
     SetTheme(Theme),
     SetTransparentBackground(bool),
+    SetBackgroundOpacity(u8),
     ToggleThemePicker,
     HideThemePicker,
     SetFont(String),

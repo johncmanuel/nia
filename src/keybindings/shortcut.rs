@@ -17,7 +17,7 @@ pub(crate) struct Shortcut {
 impl Shortcut {
     pub(super) fn new(key: char, modifiers: Modifiers) -> Option<Self> {
         let key = key.to_ascii_lowercase();
-        if !key.is_ascii_alphanumeric() && !matches!(key, '+' | '-' | '=' | ',')
+        if !key.is_ascii_alphanumeric() && !matches!(key, '+' | '-' | '=' | ',' | '[' | ']')
             || !modifiers.intersects(Modifiers::CTRL | Modifiers::LOGO)
             || modifiers.alt()
         {

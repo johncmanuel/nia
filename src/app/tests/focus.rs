@@ -1,10 +1,17 @@
 use super::*;
 
 #[test]
-fn zen_mode_hides_chrome_and_escape_restores_it() {
+fn zen_mode_hides_footer_and_escape_restores_it() {
     let mut app = blank();
+    app.keybindings = crate::keybindings::Keybindings::default();
     let mut ui = simulator(crate::ui::view(&app));
-    ui.click("Zen").expect("zen control visible");
+    assert!(ui.find("Zen").is_err(), "footer has no Zen button");
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("J".into()),
+        Modifiers::COMMAND | Modifiers::SHIFT,
+    )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
@@ -12,7 +19,6 @@ fn zen_mode_hides_chrome_and_escape_restores_it() {
     let mut ui = simulator(crate::ui::view(&app));
     ui.find(iced::widget::Id::new(EDITOR))
         .expect("editor remains visible");
-    assert!(ui.find("Layout").is_err());
     assert!(ui.find("Settings").is_err());
     if let Ok(path) = std::env::var("NIA_ZEN_SNAPSHOT") {
         ui.snapshot(&app.theme)
@@ -30,8 +36,8 @@ fn zen_mode_hides_chrome_and_escape_restores_it() {
     );
     assert!(!app.zen_mode);
     simulator(crate::ui::view(&app))
-        .find("Layout")
-        .expect("chrome restored");
+        .find("Settings")
+        .expect("footer restored");
 }
 
 #[test]
@@ -40,7 +46,10 @@ fn zen_can_be_toggled_without_closing_settings() {
     let _ = update(&mut app, Message::ShowSettings);
     let mut ui = simulator(crate::ui::view(&app));
     assert!(ui.find(iced::widget::Id::new(EDITOR)).is_err());
-    assert!(ui.find("Untitled").is_err(), "Settings should hide tabs");
+    assert!(
+        ui.find("Untitled").is_err(),
+        "Settings should hide the editor"
+    );
     ui.click("Zen mode").expect("zen setting visible");
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
@@ -79,75 +88,28 @@ fn zen_can_be_toggled_without_closing_settings() {
 }
 
 #[test]
-fn typewriter_controls_are_available_in_settings() {
+fn zen_keeps_panes_outline_and_search() {
     let mut app = blank();
-    app.focus = crate::focus::Settings::default();
-    let _ = update(&mut app, Message::ShowSettings);
+    let _ = update(&mut app, Message::New);
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Vertical));
+    let _ = update(&mut app, Message::ShowOutline);
+    let _ = update(&mut app, Message::ShowSearch);
+    let _ = update(&mut app, Message::ToggleZen);
+    assert!(app.zen_mode && app.show_outline && app.show_search);
+    assert_eq!(app.panes.len(), 2);
     let mut ui = simulator(crate::ui::view(&app));
-    ui.find("Highlight current line")
-        .expect("highlight option visible");
-    ui.find("Lines above: 8").expect("upper context visible");
-    ui.find("Lines below: 12").expect("lower context visible");
-    ui.find("Dim unfocused").expect("dimming option visible");
-    ui.click("Typewriter scrolling")
-        .expect("typewriter control visible");
-    assert!(
-        ui.into_messages()
-            .into_iter()
-            .any(|message| matches!(message, Message::ToggleTypewriter))
-    );
-}
-
-#[test]
-fn typewriter_view_limits_visible_context_around_caret() {
-    let mut app = blank();
-    app.focus = crate::focus::Settings {
-        typewriter: true,
-        highlight_line: true,
-        lines_above: 4,
-        lines_below: 3,
-        dimming: crate::focus::Dimming::Off,
-    };
-    let contents = (1..=30)
-        .map(|number| format!("Line {number}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    app.current_mut().editor = text_editor::Content::with_text(&contents);
-    app.current_mut().editor.move_to(text_editor::Cursor {
-        position: text_editor::Position {
-            line: 14,
-            column: 7,
-        },
-        selection: None,
-    });
-    let mut ui = simulator(crate::ui::view(&app));
-    ui.snapshot(&app.theme).expect("layout typewriter editor");
-    drop(ui);
-    let _ = update(&mut app, Message::AlignTypewriter);
-    let mut ui = simulator(crate::ui::view(&app));
-    if let Ok(path) = std::env::var("NIA_TYPEWRITER_SNAPSHOT") {
-        ui.snapshot(&app.theme)
-            .expect("render typewriter mode")
-            .matches_image(path)
-            .expect("write typewriter preview");
-    }
-    let bounds = ui
-        .find(iced::widget::Id::new(EDITOR))
-        .expect("editor stays interactive")
-        .bounds();
-    assert!(bounds.height < 300.0);
-    drop(ui);
-    let id = app.current().id;
-    let _ = update(
-        &mut app,
-        Message::Edit(id, text_editor::Action::Move(text_editor::Motion::Down)),
-    );
-    assert_eq!(app.current().editor.cursor().position.line, 15);
-    if let Ok(path) = std::env::var("NIA_TYPEWRITER_MOVED_SNAPSHOT") {
-        simulator(crate::ui::view(&app))
-            .snapshot(&app.theme)
-            .expect("render moved typewriter caret")
-            .matches_image(path)
-            .expect("write moved typewriter preview");
-    }
+    ui.find(iced::widget::Id::new(OUTLINE))
+        .expect("outline remains visible");
+    ui.find(iced::widget::Id::new(SEARCH))
+        .expect("search remains visible");
+    ui.find(iced::widget::Id::new(EDITOR))
+        .expect("active pane remains visible");
+    let inactive_id = app
+        .panes
+        .iter()
+        .find_map(|(pane, id)| (*pane != app.active_pane).then_some(id))
+        .expect("second pane");
+    ui.find(iced::widget::Id::from(format!("editor-{inactive_id}")))
+        .expect("second pane remains visible");
+    assert!(ui.find("Settings").is_err(), "footer is hidden");
 }

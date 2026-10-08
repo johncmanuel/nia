@@ -1,58 +1,20 @@
 use super::muted_text;
 use crate::app::{App, Message, SEARCH};
-use iced::widget::{
-    button, checkbox, column, container, pane_grid, row, rule, scrollable, text, text_input,
-};
+use iced::widget::{button, checkbox, column, container, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
-pub(super) fn header(state: &App) -> Element<'_, Message> {
-    let tabs = state
-        .tabs
-        .iter()
-        .enumerate()
-        .fold(row![].spacing(8), |tabs, (index, tab)| {
-            let name = format!(
-                "{}{}",
-                tab.document.file_name(),
-                if tab.document.dirty { " \u{2022}" } else { "" }
-            );
-            let tabs = if index == 0 {
-                tabs
-            } else {
-                tabs.push(rule::vertical(1))
-            };
-            tabs.push(
-                row![
-                    button(text(name).size(12))
-                        .style(if index == state.active {
-                            button::secondary
-                        } else {
-                            button::text
-                        })
-                        .on_press(Message::SelectTab(index)),
-                    button(text("\u{00D7}").size(13))
-                        .style(button::text)
-                        .on_press(Message::CloseTab(index)),
-                ]
-                .spacing(6)
-                .align_y(iced::Alignment::Center),
-            )
-        });
-    let tabs = scrollable(tabs)
-        .direction(scrollable::Direction::Horizontal(
-            scrollable::Scrollbar::default(),
-        ))
-        .width(Length::Fill)
-        .height(36);
-    let mut header = row![tabs].spacing(8).align_y(iced::Alignment::Center);
-    if state.show_search {
-        let count = if state.search_all_tabs {
-            state.tab_search_hits.len()
-        } else {
-            state.search_matches().len()
-        };
-        let position = state.search_index.map_or(0, |index| index + 1);
-        header = header.push(
+pub(super) fn search_bar(state: &App) -> Option<Element<'_, Message>> {
+    if !state.show_search {
+        return None;
+    }
+    let count = if state.search_all_tabs {
+        state.tab_search_hits.len()
+    } else {
+        state.search_matches().len()
+    };
+    let position = state.search_index.map_or(0, |index| index + 1);
+    Some(
+        container(
             row![
                 text_input(
                     if state.search_all_tabs {
@@ -89,33 +51,11 @@ pub(super) fn header(state: &App) -> Element<'_, Message> {
             ]
             .spacing(6)
             .align_y(iced::Alignment::Center),
-        );
-    }
-    if state.show_layout {
-        header = header.push(
-            row![
-                button(text("Single").size(12))
-                    .style(button::text)
-                    .on_press(Message::SinglePane),
-                button(text("Split right").size(12))
-                    .style(button::text)
-                    .on_press(Message::SplitPane(pane_grid::Axis::Vertical)),
-                button(text("Split down").size(12))
-                    .style(button::text)
-                    .on_press(Message::SplitPane(pane_grid::Axis::Horizontal)),
-            ]
-            .spacing(4),
-        );
-    }
-    header = header.push(
-        button(text("Layout").size(12))
-            .style(button::text)
-            .on_press(Message::ToggleLayout),
-    );
-    container(header)
+        )
         .width(Length::Fill)
         .padding([8, 20])
-        .into()
+        .into(),
+    )
 }
 
 pub(super) fn search_results(state: &App) -> Option<Element<'_, Message>> {

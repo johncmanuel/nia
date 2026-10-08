@@ -1,6 +1,6 @@
 use super::{footer_button, muted_text, theme};
 use crate::app::{App, Message};
-use crate::focus::{Dimming, MAX_CONTEXT};
+use crate::focus::Dimming;
 use crate::keybindings::Slot;
 use iced::theme::Base;
 use iced::widget::{
@@ -80,32 +80,9 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
                 .on_toggle(|_| Message::ToggleZen),
         )
         .push(
-            checkbox(state.focus.typewriter)
-                .label("Typewriter scrolling")
-                .on_toggle(|_| Message::ToggleTypewriter),
-        )
-        .push(
             checkbox(state.focus.highlight_line)
                 .label("Highlight current line")
                 .on_toggle(Message::SetHighlightLine),
-        )
-        .push(
-            row![
-                text(format!("Lines above: {}", state.focus.lines_above)),
-                button("-")
-                    .on_press(Message::SetLinesAbove(state.focus.lines_above.saturating_sub(1))),
-                button("+").on_press(Message::SetLinesAbove(
-                    state.focus.lines_above.saturating_add(1).min(MAX_CONTEXT)
-                )),
-                text(format!("Lines below: {}", state.focus.lines_below)),
-                button("-")
-                    .on_press(Message::SetLinesBelow(state.focus.lines_below.saturating_sub(1))),
-                button("+").on_press(Message::SetLinesBelow(
-                    state.focus.lines_below.saturating_add(1).min(MAX_CONTEXT)
-                )),
-            ]
-            .spacing(8)
-            .align_y(iced::Alignment::Center),
         )
         .push(
             row![
@@ -117,7 +94,7 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
         )
         .push(text("Keybindings").size(18))
         .push(
-        text("Click a shortcut, then press Command or Control with a letter, number, Tab, plus, minus, or comma. Escape cancels.")
+        text("Click a shortcut, then press Command or Control with a letter, number, bracket, Tab, plus, minus, or comma. Escape cancels.")
             .size(13)
             .style(muted_text),
         );

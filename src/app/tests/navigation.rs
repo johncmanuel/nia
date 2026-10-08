@@ -38,7 +38,14 @@ fn tab_and_find_controls_work_in_headless_ui() {
             .matches_image(path)
             .expect("write preview");
     }
-    ui.click("New").expect("New button visible");
+    assert!(ui.find("New").is_err());
+    assert!(ui.find("Layout").is_err());
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("t".into()),
+        Modifiers::COMMAND,
+    )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
@@ -46,7 +53,13 @@ fn tab_and_find_controls_work_in_headless_ui() {
     assert_eq!(app.active, 1);
 
     let mut ui = simulator(crate::ui::view(&app));
-    ui.click("Untitled \u{2022}").expect("dirty tab visible");
+    assert!(ui.find("Untitled \u{2022}").is_err());
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("1".into()),
+        Modifiers::COMMAND,
+    )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
@@ -206,6 +219,7 @@ fn search_does_not_move_the_editor() {
 #[test]
 fn browser_shortcuts_create_switch_and_close_tabs() {
     let mut app = blank();
+    app.keybindings = crate::keybindings::Keybindings::default();
     let mut ui = simulator(crate::ui::view(&app));
     ui.click(iced::widget::Id::new(EDITOR))
         .expect("editor visible");
@@ -223,8 +237,8 @@ fn browser_shortcuts_create_switch_and_close_tabs() {
     ui.click(iced::widget::Id::new(EDITOR))
         .expect("editor visible");
     ui.simulate([shortcut_event(
-        Key::Named(iced::keyboard::key::Named::Tab),
-        Modifiers::CTRL,
+        Key::Character("1".into()),
+        Modifiers::COMMAND,
     )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);

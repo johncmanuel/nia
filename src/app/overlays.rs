@@ -5,29 +5,39 @@ use iced::widget::{operation, text_editor};
 pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::ShowSettings => {
-            state.show_layout = false;
+            state.handbook = None;
             state.show_settings = true;
             state.show_theme_picker = false;
             state.recording = None;
             state.clear_search();
             state.notice = None;
         }
+        Message::ShowHandbook => {
+            state.show_settings = false;
+            state.clear_search();
+            state.handbook = Some(iced::widget::markdown::Content::parse(include_str!(
+                "../../HANDBOOK.md"
+            )));
+        }
+        Message::HideHandbook => {
+            state.handbook = None;
+            return operation::focus(EDITOR);
+        }
         Message::ShowEditor => {
             state.show_settings = false;
+            state.handbook = None;
             state.show_theme_picker = false;
             state.current_mut().reading = None;
             state.recording = None;
             state.notice = None;
-            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
+            return operation::focus(EDITOR);
         }
         Message::ToggleReading => {
-            state.zen_mode = false;
             state.show_settings = false;
             if state.current().reading.is_some() {
                 state.current_mut().reading = None;
                 return operation::focus(EDITOR);
             }
-            state.show_layout = false;
             state.clear_search();
             state.current_mut().sync_document();
             let content =
@@ -39,9 +49,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             return iced::clipboard::write(url);
         }
         Message::ShowSearch | Message::ShowTabSearch => {
-            state.zen_mode = false;
             state.current_mut().reading = None;
-            state.show_layout = false;
             state.show_settings = false;
             state.show_recent = false;
             state.show_search = true;
@@ -119,7 +127,6 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ShowOutline => {
-            state.zen_mode = false;
             state.show_settings = false;
             state.show_search = false;
             state.show_recent = false;
@@ -154,20 +161,15 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
         Message::JumpOutline(index) => {
             if let Some(heading) = state.outline_items().get(index) {
                 let line = heading.line;
-                let focus = state.focus;
                 state.current_mut().reading = None;
-                state.current_mut().move_editor_to(
-                    text_editor::Cursor {
-                        position: text_editor::Position { line, column: 0 },
-                        selection: None,
-                    },
-                    focus,
-                );
+                state.current_mut().editor.move_to(text_editor::Cursor {
+                    position: text_editor::Position { line, column: 0 },
+                    selection: None,
+                });
                 return operation::focus(EDITOR);
             }
         }
         Message::ShowRecent => {
-            state.zen_mode = false;
             state.show_settings = false;
             state.show_search = false;
             state.show_recent = true;

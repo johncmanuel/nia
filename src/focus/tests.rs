@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn focus_settings_round_trip_and_reject_invalid_context() -> io::Result<()> {
+fn focus_settings_round_trip_and_migrate_typewriter_settings() -> io::Result<()> {
     let path = std::env::temp_dir().join(format!(
         "nia-focus-{}-{}.conf",
         std::process::id(),
@@ -13,15 +13,14 @@ fn focus_settings_round_trip_and_reject_invalid_context() -> io::Result<()> {
     let result = (|| {
         assert_eq!(Settings::load_from(&path)?, Settings::default());
         let settings = Settings {
-            typewriter: true,
             highlight_line: true,
-            lines_above: 4,
-            lines_below: 6,
             dimming: Dimming::Sentence,
         };
         settings.save_to(&path)?;
         assert_eq!(Settings::load_from(&path)?, settings);
-        fs::write(&path, "true\ntrue\n31\n6\nSentence\n")?;
+        fs::write(&path, "true\ntrue\n4\n6\nSentence\n")?;
+        assert_eq!(Settings::load_from(&path)?, settings);
+        fs::write(&path, "true\nUnknown\n")?;
         assert_eq!(
             Settings::load_from(&path).unwrap_err().kind(),
             ErrorKind::InvalidData

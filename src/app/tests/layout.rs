@@ -1,16 +1,18 @@
 use super::*;
 
 #[test]
-fn layout_control_splits_without_permanent_buttons() {
+fn layout_shortcuts_work_without_a_layout_button() {
     let mut app = blank();
+    app.keybindings = crate::keybindings::Keybindings::default();
     let mut ui = simulator(crate::ui::view(&app));
     assert!(ui.find("Split right").is_err());
-    ui.click("Layout").expect("layout control visible");
-    for message in ui.into_messages() {
-        let _ = update(&mut app, message);
-    }
-    let mut ui = simulator(crate::ui::view(&app));
-    ui.click("Split right").expect("split option visible");
+    assert!(ui.find("Layout").is_err());
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("d".into()),
+        Modifiers::COMMAND,
+    )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
@@ -28,14 +30,104 @@ fn layout_control_splits_without_permanent_buttons() {
 }
 
 #[test]
-fn split_panes_show_and_edit_separate_documents() {
+fn command_t_opens_a_group_with_its_own_layout_and_compact_bar() {
     let mut app = blank();
+    app.keybindings = crate::keybindings::Keybindings::default();
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Vertical));
+    app.tabs[0].editor = text_editor::Content::with_text("keep first document");
+    app.tabs[0].document.mark_edited();
+    let mut ui = simulator(crate::ui::view(&app));
+    assert!(ui.find("1  Untitled").is_err(), "one group has no tab bar");
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("t".into()),
+        Modifiers::COMMAND,
+    )]);
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.groups.len(), 2);
+    assert_eq!(app.active_group, 1);
+    assert_eq!(app.panes.len(), 1);
+    assert_eq!(
+        app.groups[0]
+            .inactive
+            .as_ref()
+            .expect("first group layout")
+            .panes
+            .len(),
+        2
+    );
+    let mut ui = simulator(crate::ui::view(&app));
+    if let Ok(path) = std::env::var("NIA_GROUP_SNAPSHOT") {
+        ui.snapshot(&app.theme)
+            .expect("render tab groups")
+            .matches_image(path)
+            .expect("write group preview");
+    }
+    ui.find("1  Untitled").expect("first group in tab bar");
+    ui.find("2  Untitled").expect("second group in tab bar");
+    drop(ui);
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Horizontal));
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("1  Untitled").expect("first group selectable");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.active_group, 0);
+    assert_eq!(app.tabs[0].editor.text(), "keep first document");
+    assert!(matches!(
+        app.panes.layout(),
+        pane_grid::Node::Split {
+            axis: pane_grid::Axis::Vertical,
+            ..
+        }
+    ));
     let mut ui = simulator(crate::ui::view(&app));
     ui.click(iced::widget::Id::new(EDITOR))
         .expect("editor visible");
     ui.simulate([shortcut_event(
-        Key::Character("R".into()),
-        Modifiers::CTRL | Modifiers::SHIFT,
+        Key::Character("2".into()),
+        Modifiers::COMMAND,
+    )]);
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.active_group, 1);
+    assert!(matches!(
+        app.panes.layout(),
+        pane_grid::Node::Split {
+            axis: pane_grid::Axis::Horizontal,
+            ..
+        }
+    ));
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click("+").expect("new group control visible");
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.groups.len(), 3);
+    assert_eq!(app.panes.len(), 1);
+    let _ = update(&mut app, Message::ToggleZen);
+    assert!(
+        simulator(crate::ui::view(&app))
+            .find("1  Untitled")
+            .is_err(),
+        "Zen hides the group bar"
+    );
+}
+
+#[test]
+fn split_panes_show_and_edit_separate_documents() {
+    let mut app = blank();
+    app.keybindings = crate::keybindings::Keybindings::default();
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("d".into()),
+        Modifiers::COMMAND,
     )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
@@ -73,13 +165,27 @@ fn split_panes_show_and_edit_separate_documents() {
 }
 
 #[test]
-fn existing_tabs_can_be_arranged_and_replaced_in_panes() {
+fn keyboard_splits_below_and_navigation_keeps_visible_panes_in_place() {
     let mut app = blank();
-    let _ = update(&mut app, Message::New);
-    let _ = update(&mut app, Message::New);
-    let _ = update(&mut app, Message::SelectTab(0));
-    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Vertical));
-    assert_eq!(app.tabs.len(), 3);
+    app.keybindings = crate::keybindings::Keybindings::default();
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("d".into()),
+        Modifiers::COMMAND | Modifiers::SHIFT,
+    )]);
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.tabs.len(), 2);
+    assert!(matches!(
+        app.panes.layout(),
+        pane_grid::Node::Split {
+            axis: pane_grid::Axis::Horizontal,
+            ..
+        }
+    ));
     let second = app.active_pane;
     let first = *app
         .panes
@@ -87,32 +193,126 @@ fn existing_tabs_can_be_arranged_and_replaced_in_panes() {
         .find(|(_, id)| **id == 0)
         .expect("first pane")
         .0;
-    assert_eq!(*app.panes.get(second).expect("second pane"), 1);
-
-    let _ = update(&mut app, Message::ActivatePane(first));
-    let _ = update(&mut app, Message::SelectTab(1));
-    assert_eq!(*app.panes.get(first).expect("first pane"), 1);
-    assert_eq!(*app.panes.get(second).expect("second pane"), 0);
-    assert_eq!(app.active_pane, first);
-
-    let _ = update(&mut app, Message::CloseTab(1));
-    assert_eq!(app.panes.len(), 2);
-    assert_eq!(*app.panes.get(first).expect("replacement pane"), 2);
-    assert_eq!(app.current().id, 2);
-
     let mut ui = simulator(crate::ui::view(&app));
     ui.click(iced::widget::Id::new(EDITOR))
-        .expect("editor visible");
+        .expect("second editor visible");
     ui.simulate([shortcut_event(
-        Key::Character("L".into()),
-        Modifiers::CTRL | Modifiers::SHIFT,
+        Key::Character("[".into()),
+        Modifiers::COMMAND,
     )]);
     for message in ui.into_messages() {
         let _ = update(&mut app, message);
     }
+    assert_eq!(app.active_pane, first);
+    assert_eq!(app.panes.get(first), Some(&0));
+    assert_eq!(app.panes.get(second), Some(&1));
+
+    let mut ui = simulator(crate::ui::view(&app));
+    ui.click(iced::widget::Id::new(EDITOR))
+        .expect("first editor visible");
+    ui.simulate([shortcut_event(
+        Key::Character("]".into()),
+        Modifiers::COMMAND,
+    )]);
+    for message in ui.into_messages() {
+        let _ = update(&mut app, message);
+    }
+    assert_eq!(app.active_pane, second);
+}
+
+#[test]
+fn bracket_shortcuts_follow_split_layout_within_the_selected_group() {
+    let mut app = blank();
+    app.keybindings = crate::keybindings::Keybindings::default();
+    let first = app.active_pane;
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Vertical));
+    let right = app.active_pane;
+    let _ = update(&mut app, Message::ActivatePane(first));
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Horizontal));
+    let lower_left = app.active_pane;
+    let _ = update(&mut app, Message::NewGroup);
+    assert_eq!(app.active_group, 1);
+
+    for (number, group) in [("1", 0), ("2", 1), ("1", 0)] {
+        let mut ui = simulator(crate::ui::view(&app));
+        ui.click(iced::widget::Id::new(EDITOR))
+            .expect("active editor visible");
+        ui.simulate([shortcut_event(
+            Key::Character(number.into()),
+            Modifiers::COMMAND,
+        )]);
+        for message in ui.into_messages() {
+            let _ = update(&mut app, message);
+        }
+        assert_eq!(app.active_group, group);
+    }
+    assert_eq!(app.active_pane, lower_left);
+
+    for (key, expected) in [("]", right), ("]", first), ("]", lower_left), ("[", first)] {
+        let mut ui = simulator(crate::ui::view(&app));
+        ui.click(iced::widget::Id::new(EDITOR))
+            .expect("active editor visible");
+        ui.simulate([shortcut_event(
+            Key::Character(key.into()),
+            Modifiers::COMMAND,
+        )]);
+        for message in ui.into_messages() {
+            let _ = update(&mut app, message);
+        }
+        assert_eq!(app.active_pane, expected);
+        assert_eq!(app.active_group, 0);
+        assert_eq!(app.panes.len(), 3);
+    }
+}
+
+#[test]
+fn groups_keep_their_own_layouts_when_documents_close() {
+    let mut app = blank();
+    let _ = update(&mut app, Message::NewGroup);
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Horizontal));
+    assert_eq!(app.panes.len(), 2);
+    let _ = update(&mut app, Message::SelectGroup(0));
+    let _ = update(&mut app, Message::SplitPane(pane_grid::Axis::Vertical));
+    assert_eq!(app.tabs.len(), 4);
+    assert_eq!(app.active_group, 0);
+    assert!(matches!(
+        app.panes.layout(),
+        pane_grid::Node::Split {
+            axis: pane_grid::Axis::Vertical,
+            ..
+        }
+    ));
+    let _ = update(&mut app, Message::CloseTab(1));
+    assert_eq!(
+        app.active_group, 0,
+        "closing a background group keeps the current group"
+    );
+    assert_eq!(app.groups.len(), 2);
+    assert_eq!(app.tabs.len(), 3);
+    assert_eq!(app.panes.len(), 2);
+    let _ = update(&mut app, Message::SinglePane);
     assert_eq!(app.panes.len(), 1);
-    assert_eq!(app.tabs.len(), 2);
+    let _ = update(&mut app, Message::SelectGroup(1));
+    assert_eq!(app.panes.len(), 1, "closed document's pane was removed");
     assert_eq!(app.panes.get(app.active_pane), Some(&2));
+}
+
+#[test]
+fn closing_the_last_document_closes_only_its_group() {
+    let mut app = blank();
+    let _ = update(&mut app, Message::NewGroup);
+    app.current_mut().editor = text_editor::Content::with_text("keep this draft");
+    app.current_mut().document.mark_edited();
+    let _ = update(&mut app, Message::CloseCurrentTab);
+    assert_eq!(app.pending_close, Some(CloseTarget::Tab(1)));
+    let _ = update(&mut app, Message::CancelClose);
+    assert_eq!(app.groups.len(), 2);
+    assert_eq!(app.current().editor.text(), "keep this draft");
+    let _ = update(&mut app, Message::CloseCurrentTab);
+    let _ = update(&mut app, Message::DiscardAndClose);
+    assert_eq!(app.groups.len(), 1);
+    assert_eq!(app.tabs.len(), 1);
+    assert_eq!(app.current().id, 0);
 }
 
 #[test]
@@ -174,7 +374,7 @@ fn long_word_stays_inside_writing_area() {
     .expect("decode preview");
     let mut pixels = vec![0; reader.output_buffer_size().expect("preview size")];
     reader.next_frame(&mut pixels).expect("read preview pixels");
-    // iced_test renders at 2x scale. Sample the right margin below the tab bar.
+    // iced_test renders at 2x scale. Sample the right margin beside the editor.
     let background = &pixels[..3];
     assert!(
         (200..300).all(|y| (1360..1400).all(|x| {

@@ -103,7 +103,7 @@ jobs:
           mkdir -p dist
           stage="dist/$name"
           mkdir "$stage"
-          cp README.md LICENSE PRIVACY.md "$stage/"
+          cp README.md HANDBOOK.md LICENSE PRIVACY.md "$stage/"
           if [[ $RUNNER_OS == macOS ]]; then
             mkdir -p "$stage/nia.app/Contents/MacOS"
             cp "$binary" "$stage/nia.app/Contents/MacOS/nia"

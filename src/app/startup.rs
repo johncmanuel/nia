@@ -1,4 +1,4 @@
-use super::{App, Message, Tab};
+use super::{App, Message, Tab, TabGroup, session};
 use crate::document::Document;
 use crate::keybindings::Keybindings;
 use crate::{focus, font, recent, recovery, theme};
@@ -8,16 +8,18 @@ use std::path::PathBuf;
 
 pub(crate) fn boot() -> (App, Task<Message>) {
     let mut state = blank();
+    match session::load() {
+        Ok(Some(saved)) => session::restore(&mut state, saved),
+        Err(_) => {
+            state.notice = Some("Could not restore the saved layout.".into());
+            log::warn!("layout restore failed");
+        }
+        Ok(None) => {}
+    }
     match recovery::load() {
         Ok(drafts) if !drafts.is_empty() => {
-            state.tabs.clear();
             for draft in drafts {
-                let id = state.next_id();
-                state.tabs.push(Tab::recovered(id, draft));
-            }
-            state.active = state.tabs.len() - 1;
-            if let Some(tab_id) = state.panes.get_mut(state.active_pane) {
-                *tab_id = state.tabs[state.active].id;
+                state.push_recovered_group(draft);
             }
             state.notice = Some("Recovered local drafts. Save each draft to keep it.".into());
             log::info!("local drafts recovered");
@@ -108,7 +110,11 @@ pub(crate) fn blank() -> App {
         active: 0,
         panes,
         active_pane,
-        show_layout: false,
+        groups: vec![TabGroup {
+            tabs: vec![0],
+            inactive: None,
+        }],
+        active_group: 0,
         next_id: 1,
         notice: notice
             .or(theme_notice)
@@ -120,6 +126,7 @@ pub(crate) fn blank() -> App {
         dialog_open: false,
         keybindings,
         show_settings: false,
+        handbook: None,
         zen_mode: false,
         focus,
         recording: None,

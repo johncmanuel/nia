@@ -50,14 +50,10 @@ impl App {
         };
         self.select_tab(tab_index);
         self.current_mut().reading = None;
-        let focus = self.focus;
-        self.current_mut().move_editor_to(
-            text_editor::Cursor {
-                position: hit.end,
-                selection: Some(hit.start),
-            },
-            focus,
-        );
+        self.current_mut().editor.move_to(text_editor::Cursor {
+            position: hit.end,
+            selection: Some(hit.start),
+        });
         self.search_index = Some(index);
         true
     }

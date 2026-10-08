@@ -2,58 +2,19 @@ use super::{App, EDITOR, Message};
 use crate::keybindings::Keybindings;
 use iced::Task;
 use iced::theme::Base;
-use iced::widget::{operation, text_editor};
+use iced::widget::operation;
 
 pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::ToggleZen => {
             state.zen_mode = !state.zen_mode;
-            if state.zen_mode && !state.show_settings {
-                state.show_layout = false;
-                state.clear_search();
-                state.current_mut().reading = None;
-            }
             if state.show_settings {
                 return Task::none();
             }
-            return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
-        }
-        Message::ToggleTypewriter => {
-            state.focus.typewriter = !state.focus.typewriter;
-            for tab in &mut state.tabs {
-                tab.typewriter_aligned = false;
-            }
-            save_focus(state);
-            if state.focus.typewriter && !state.show_settings {
-                return operation::focus(EDITOR).chain(Task::done(Message::AlignTypewriter));
-            }
-        }
-        Message::AlignTypewriter => {
-            if state.focus.typewriter && !state.show_settings {
-                let above = state.focus.lines_above;
-                state.current_mut().align_typewriter(above);
-            }
+            return operation::focus(EDITOR);
         }
         Message::SetHighlightLine(enabled) => {
             state.focus.highlight_line = enabled;
-            save_focus(state);
-        }
-        Message::SetLinesAbove(count) => {
-            let count = count.min(crate::focus::MAX_CONTEXT);
-            let difference = i32::from(state.focus.lines_above) - i32::from(count);
-            state.focus.lines_above = count;
-            if state.focus.typewriter && difference != 0 {
-                for tab in &mut state.tabs {
-                    if tab.typewriter_aligned {
-                        tab.editor
-                            .perform(text_editor::Action::Scroll { lines: difference });
-                    }
-                }
-            }
-            save_focus(state);
-        }
-        Message::SetLinesBelow(count) => {
-            state.focus.lines_below = count.min(crate::focus::MAX_CONTEXT);
             save_focus(state);
         }
         Message::SetDimming(dimming) => {

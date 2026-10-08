@@ -1,10 +1,12 @@
 use crate::app::{App, Message};
-use iced::widget::{button, column, row, rule, text};
+use iced::widget::{Stack, button, column, container, row, rule, text};
 use iced::{Element, Length, Theme};
 
 mod confirm;
 mod editor;
 mod footer;
+mod groups;
+mod handbook;
 mod navigation;
 mod outline;
 mod reading;
@@ -18,12 +20,8 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
     if state.show_settings {
         return settings::settings_page(state);
     }
-    if state.zen_mode {
-        return editor::editor_view(state, state.current(), true);
-    }
-    let mut page = column![navigation::header(state)];
-    if let Some(results) = navigation::search_results(state) {
-        page = page.push(results);
+    if state.handbook.is_some() {
+        return handbook::page(state);
     }
     let content: Element<'_, Message> = if state.show_outline {
         row![
@@ -36,11 +34,30 @@ pub(crate) fn view(state: &App) -> Element<'_, Message> {
     } else {
         editor::panes_view(state)
     };
-    page.push(content)
-        .push(footer::view(state))
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    let mut page = column![content];
+    if !state.zen_mode {
+        if state.groups.len() > 1 {
+            page = column![groups::view(state), page].height(Length::Fill);
+        }
+        page = page.push(footer::view(state));
+    }
+    let page: Element<'_, Message> = page.width(Length::Fill).height(Length::Fill).into();
+    if let Some(search) = navigation::search_bar(state) {
+        let mut panel = column![search];
+        if let Some(results) = navigation::search_results(state) {
+            panel = panel.push(results);
+        }
+        Stack::new()
+            .push(page)
+            .push(container(panel).width(Length::Fill).style(|theme: &Theme| {
+                container::Style::default().background(theme.palette().background)
+            }))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    } else {
+        page
+    }
 }
 
 fn muted_text(theme: &Theme) -> text::Style {

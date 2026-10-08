@@ -6,11 +6,13 @@ use std::time::Duration;
 mod close;
 mod files;
 mod focus;
+mod handbook;
 mod layout;
 mod navigation;
 mod outline;
 mod performance;
 mod reading;
+mod session;
 mod settings;
 
 fn shortcut_event(key: Key, modifiers: Modifiers) -> iced::Event {

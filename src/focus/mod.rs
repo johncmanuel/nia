@@ -5,8 +5,6 @@ use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 
-pub(crate) const MAX_CONTEXT: u8 = 30;
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum Dimming {
     #[default]
@@ -35,20 +33,14 @@ impl fmt::Display for Dimming {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Settings {
-    pub(crate) typewriter: bool,
     pub(crate) highlight_line: bool,
-    pub(crate) lines_above: u8,
-    pub(crate) lines_below: u8,
     pub(crate) dimming: Dimming,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            typewriter: false,
             highlight_line: false,
-            lines_above: 8,
-            lines_below: 12,
             dimming: Dimming::Off,
         }
     }
@@ -65,35 +57,27 @@ impl Settings {
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Self::default()),
             Err(error) => return Err(error),
         };
-        let mut parts = value.lines();
         let invalid = || io::Error::new(ErrorKind::InvalidData, "invalid focus settings");
-        let parse_bool = |value: Option<&str>| match value {
-            Some("true") => Ok(true),
-            Some("false") => Ok(false),
-            _ => Err(invalid()),
+        let parts: Vec<_> = value.lines().collect();
+        let (highlight, dimming) = match parts.as_slice() {
+            [highlight, dimming] | [_, highlight, _, _, dimming] => (*highlight, *dimming),
+            _ => return Err(invalid()),
         };
-        let parse_count = |value: Option<&str>| {
-            value
-                .and_then(|value| value.parse::<u8>().ok())
-                .filter(|count| *count <= MAX_CONTEXT)
-                .ok_or_else(invalid)
+        let highlight_line = match highlight {
+            "true" => true,
+            "false" => false,
+            _ => return Err(invalid()),
         };
-        let settings = Self {
-            typewriter: parse_bool(parts.next())?,
-            highlight_line: parse_bool(parts.next())?,
-            lines_above: parse_count(parts.next())?,
-            lines_below: parse_count(parts.next())?,
-            dimming: match parts.next() {
-                Some("Off") => Dimming::Off,
-                Some("Paragraph") => Dimming::Paragraph,
-                Some("Sentence") => Dimming::Sentence,
-                _ => return Err(invalid()),
-            },
+        let dimming = match dimming {
+            "Off" => Dimming::Off,
+            "Paragraph" => Dimming::Paragraph,
+            "Sentence" => Dimming::Sentence,
+            _ => return Err(invalid()),
         };
-        if parts.next().is_some() {
-            return Err(invalid());
-        }
-        Ok(settings)
+        Ok(Self {
+            highlight_line,
+            dimming,
+        })
     }
 
     pub(crate) fn save(self) -> io::Result<()> {
@@ -107,14 +91,7 @@ impl Settings {
         fs::create_dir_all(parent)?;
         fs::write(
             path,
-            format!(
-                "{}\n{}\n{}\n{}\n{}\n",
-                self.typewriter,
-                self.highlight_line,
-                self.lines_above,
-                self.lines_below,
-                self.dimming.name()
-            ),
+            format!("{}\n{}\n", self.highlight_line, self.dimming.name()),
         )
     }
 }

@@ -1,5 +1,4 @@
 use super::*;
-use iced::keyboard::key::Named;
 
 #[test]
 fn defaults_use_the_operating_system_primary_modifier() {
@@ -18,12 +17,15 @@ fn defaults_use_the_operating_system_primary_modifier() {
         (Slot::Recent, "p", false),
         (Slot::NewTab, "t", false),
         (Slot::CloseTab, "w", false),
+        (Slot::NextTab, "]", false),
+        (Slot::PreviousTab, "[", false),
+        (Slot::SplitRight, "d", false),
+        (Slot::SplitDown, "d", true),
         (Slot::FindTabs, "f", true),
         (Slot::IncreaseFontSize, "+", false),
         (Slot::DecreaseFontSize, "-", false),
         (Slot::Settings, ",", false),
         (Slot::Zen, "j", true),
-        (Slot::Typewriter, "y", true),
     ] {
         let modifiers = if shifted {
             primary | Modifiers::SHIFT
@@ -42,10 +44,6 @@ fn defaults_use_the_operating_system_primary_modifier() {
                 .starts_with(prefix)
         );
     }
-    assert_eq!(
-        defaults.matching(&Key::Named(Named::Tab), Modifiers::CTRL),
-        Some(Slot::NextTab)
-    );
     if !cfg!(target_os = "macos") {
         assert_eq!(defaults.get(Slot::AlternateSave), None);
         assert_eq!(defaults.get(Slot::AlternateFind), None);
@@ -57,20 +55,16 @@ fn defaults_use_the_operating_system_primary_modifier() {
 }
 
 #[test]
-fn older_keybindings_gain_focus_shortcuts() {
+fn older_keybindings_gain_zen_shortcut() {
     let defaults = Keybindings::default();
     let old = defaults
         .encode()
         .lines()
-        .take(19)
+        .take(Slot::Zen as usize)
         .collect::<Vec<_>>()
         .join("\n");
     let restored = Keybindings::decode(&old).expect("previous keybindings file");
     assert_eq!(restored.get(Slot::Zen), defaults.get(Slot::Zen));
-    assert_eq!(
-        restored.get(Slot::Typewriter),
-        defaults.get(Slot::Typewriter)
-    );
     assert_eq!(
         restored.matching(
             &Key::Character("j".into()),
@@ -78,6 +72,13 @@ fn older_keybindings_gain_focus_shortcuts() {
         ),
         Some(Slot::Zen)
     );
+}
+
+#[test]
+fn old_typewriter_shortcut_is_ignored() {
+    let defaults = Keybindings::default();
+    let old = format!("{}meta+shift+y\n", defaults.encode());
+    assert_eq!(Keybindings::decode(&old), Some(defaults));
 }
 
 #[test]
@@ -108,7 +109,7 @@ fn settings_shortcut_round_trips_and_is_added_to_old_settings() {
     let old = defaults
         .encode()
         .lines()
-        .take(Slot::ALL.len() - 1)
+        .take(Slot::Settings as usize)
         .collect::<Vec<_>>()
         .join("\n");
     let restored = Keybindings::decode(&old).expect("previous keybindings file");
@@ -275,8 +276,69 @@ fn browser_tab_shortcuts_survive_old_settings_and_round_trip() {
     assert_eq!(loaded.get(Slot::NextTab), defaults.get(Slot::NextTab));
     assert_eq!(Keybindings::decode(&loaded.encode()), Some(loaded.clone()));
     assert_eq!(
-        loaded.matching(&Key::Named(Named::Tab), Modifiers::CTRL | Modifiers::SHIFT),
+        loaded.matching(&Key::Character("[".into()), Modifiers::COMMAND),
         Some(Slot::PreviousTab)
+    );
+}
+
+#[test]
+fn old_default_navigation_and_split_shortcuts_migrate() {
+    let mut old = Keybindings::default();
+    for (slot, shortcut) in [
+        (Slot::NextTab, Shortcut::tab(Modifiers::CTRL)),
+        (
+            Slot::PreviousTab,
+            Shortcut::tab(Modifiers::CTRL | Modifiers::SHIFT),
+        ),
+        (
+            Slot::SplitRight,
+            Shortcut::new('r', Modifiers::CTRL | Modifiers::SHIFT),
+        ),
+        (
+            Slot::SplitDown,
+            Shortcut::new('d', Modifiers::CTRL | Modifiers::SHIFT),
+        ),
+    ] {
+        old.shortcuts[slot as usize] = shortcut;
+    }
+    let restored = Keybindings::decode(&old.encode()).expect("old shortcuts");
+    for slot in [
+        Slot::NextTab,
+        Slot::PreviousTab,
+        Slot::SplitRight,
+        Slot::SplitDown,
+    ] {
+        assert_eq!(restored.get(slot), Keybindings::default().get(slot));
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn saved_macos_navigation_and_split_bindings_use_requested_shortcuts() {
+    let mut old = Keybindings::default();
+    old.shortcuts[Slot::NextTab as usize] = Shortcut::tab(Modifiers::CTRL);
+    old.shortcuts[Slot::PreviousTab as usize] = Shortcut::tab(Modifiers::CTRL | Modifiers::SHIFT);
+    old.shortcuts[Slot::SplitRight as usize] =
+        Shortcut::new('r', Modifiers::COMMAND | Modifiers::SHIFT);
+    let loaded = Keybindings::decode(&old.encode()).expect("saved macOS shortcuts");
+    assert_eq!(
+        loaded.matching(&Key::Character("]".into()), Modifiers::COMMAND),
+        Some(Slot::NextTab)
+    );
+    assert_eq!(
+        loaded.matching(&Key::Character("[".into()), Modifiers::COMMAND),
+        Some(Slot::PreviousTab)
+    );
+    assert_eq!(
+        loaded.matching(&Key::Character("d".into()), Modifiers::COMMAND),
+        Some(Slot::SplitRight)
+    );
+    assert_eq!(
+        loaded.matching(
+            &Key::Character("d".into()),
+            Modifiers::COMMAND | Modifiers::SHIFT
+        ),
+        Some(Slot::SplitDown)
     );
 }
 

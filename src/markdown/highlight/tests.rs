@@ -6,7 +6,6 @@ fn highlights_markdown_without_treating_fenced_headings_as_headings() {
     let settings = HighlightSettings {
         font: Font::MONOSPACE,
         active_line: None,
-        context: None,
         focus: None,
         highlight_line: false,
     };
@@ -44,11 +43,10 @@ fn highlights_markdown_without_treating_fenced_headings_as_headings() {
 }
 
 #[test]
-fn focus_dimming_and_context_apply_after_markdown_colors() {
+fn focus_dimming_does_not_hide_other_lines() {
     let settings = HighlightSettings {
         font: Font::MONOSPACE,
         active_line: Some(0),
-        context: Some((0, 0)),
         focus: Some(crate::focus::Span {
             start: crate::focus::Point { line: 0, byte: 6 },
             end: crate::focus::Point { line: 0, byte: 10 },
@@ -60,8 +58,45 @@ fn focus_dimming_and_context_apply_after_markdown_colors() {
     assert!(first.contains(&(0..10, (Kind::Current, Font::MONOSPACE))));
     assert!(first.contains(&(0..6, (Kind::Dim, Font::MONOSPACE))));
     let second = highlighter.highlight_line("outside").collect::<Vec<_>>();
-    assert_eq!(
-        second.last(),
-        Some(&(0..7, (Kind::Hidden, Font::MONOSPACE)))
+    assert!(
+        second.iter().all(|(_, highlight)| {
+            format(highlight, &Theme::Dark)
+                .color
+                .is_none_or(|color| color.a > 0.0)
+        }),
+        "a line outside the cursor context can still be inside the editor viewport"
+    );
+}
+
+#[test]
+fn removing_focus_rehighlights_lines_before_the_old_focus() {
+    let focused = HighlightSettings {
+        font: Font::MONOSPACE,
+        active_line: Some(2),
+        focus: Some(crate::focus::Span {
+            start: crate::focus::Point { line: 2, byte: 0 },
+            end: crate::focus::Point { line: 2, byte: 5 },
+        }),
+        highlight_line: false,
+    };
+    let mut highlighter = MarkdownHighlighter::new(&focused);
+    assert!(
+        highlighter
+            .highlight_line("dimmed")
+            .any(|(_, (kind, _))| kind == Kind::Dim)
+    );
+    highlighter.highlight_line("dimmed").for_each(drop);
+    highlighter.highlight_line("focus").for_each(drop);
+
+    highlighter.update(&HighlightSettings {
+        active_line: None,
+        focus: None,
+        ..focused
+    });
+    assert_eq!(highlighter.current_line(), 0);
+    assert!(
+        highlighter
+            .highlight_line("visible")
+            .all(|(_, (kind, _))| kind != Kind::Dim)
     );
 }

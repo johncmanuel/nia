@@ -1,6 +1,7 @@
 # TODO
 
 - [ ] Verify the first GitHub Actions build and tagged release on Linux, Windows, and both macOS architectures after pushing the workflow.
+- [ ] Verify that the first merge into `master` after the workflow update publishes a GitHub prerelease with four native archives and checksums.
 - [ ] Render Markdown images inline while writing. Read mode already displays local images.
 - [ ] Hide Markdown syntax while writing and render formatted text inline, including heading markers (for example, hide `#` and enlarge the heading text). Read mode already renders formatted text.
 

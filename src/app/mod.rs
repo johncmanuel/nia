@@ -19,6 +19,7 @@ mod preferences;
 mod save;
 mod search_tabs;
 mod session;
+mod shared;
 mod startup;
 mod state;
 mod tab;

@@ -55,6 +55,30 @@ fn wrapped_click_stays_on_source_boundary() {
 }
 
 #[test]
+fn whole_word_wrap_places_caret_on_next_visual_line() {
+    let source = "hello world";
+    let layout = layout(source, source.len(), 130.0);
+    let caret = layout.caret(source.find("world").unwrap());
+    assert_eq!(caret.position.x, LEFT);
+    assert!(caret.position.y > TOP);
+}
+
+#[test]
+fn clicking_after_emoji_edits_after_its_full_markdown_code() {
+    let mut demo = Demo::new();
+    demo.source = ":joy:\nother".to_owned();
+    demo.cursor = demo.source.len();
+    let offset =
+        layout(&demo.source, demo.cursor, 500.0).hit_test(Point::new(LEFT + BODY_SIZE, TOP + 1.0));
+    demo.update(super::Message::Place {
+        offset,
+        extend: false,
+    });
+    demo.replace_selection("!");
+    assert_eq!(demo.source, ":joy:!\nother");
+}
+
+#[test]
 fn iced_canvas_accepts_click_and_typing() {
     let mut demo = Demo::new();
     let mut ui = Simulator::with_size(
@@ -90,4 +114,12 @@ fn render_preview_for_inspection() {
         .expect("render prototype")
         .matches_image("/tmp/nia-live-markdown-prototype.png")
         .expect("write prototype image");
+    ui.point_at(Point::new(400.0, 500.0));
+    ui.simulate([iced::Event::Mouse(iced::mouse::Event::WheelScrolled {
+        delta: iced::mouse::ScrollDelta::Lines { x: 0.0, y: -8.0 },
+    })]);
+    ui.snapshot(&iced::Theme::TokyoNightStorm)
+        .expect("render scrolled prototype")
+        .matches_image("/tmp/nia-live-markdown-prototype-bottom.png")
+        .expect("write scrolled prototype image");
 }

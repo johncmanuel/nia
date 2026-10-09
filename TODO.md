@@ -21,7 +21,7 @@
 
 Read mode uses Iced's Markdown renderer and a custom image viewer. Inline formatting while typing still needs an editable rich surface with cursor mapping and Markdown source preservation.
 
-An isolated source-to-display mapping experiment is available with `cargo run --example live_markdown`. It covers headings and paired emphasis, but still needs exact glyph metrics, paste/IME, undo, images, and scrolling before it can replace the writing surface.
+An isolated source-to-display mapping experiment is available with `cargo run --example live_markdown`. It covers common block and inline syntax, but still needs full Markdown parsing, exact glyph metrics, paste/IME, undo, image rendering, and aligned tables before it can replace the writing surface.
 
 Synchronization from the design document remains deferred until requested.
 

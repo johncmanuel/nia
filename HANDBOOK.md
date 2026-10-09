@@ -41,9 +41,7 @@ Read mode shows common Markdown forms. Some extended forms, such as definition l
 
 Select **Read** to see formatted text. Select **Write** to return to the same text and cursor position.
 
-To show an image while you write, put its Markdown link on a line by itself. For example, type `![Chart](images/chart.png)`. Move the cursor to another line to see the image. Select the image to edit its Markdown link. Save a new document before you use a relative image path. nia finds a relative image path from the document's folder. It does not load images from the Internet.
-
-Read mode also shows local images. In Read mode, select a link to copy its address.
+To add an image, type its Markdown link, for example `![Chart](images/chart.png)`. The link stays visible while you write. Select **Read** to see a local image. Save a new document before you use a relative image path. nia finds a relative image path from the document's folder. It does not load images from the Internet. In Read mode, select a link to copy its address.
 
 ## Find text and headings
 

@@ -177,7 +177,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 let line = heading.line;
                 state.current_mut().reading = None;
                 state.current_mut().history.break_group();
-                state.current_mut().move_image_cursor(text_editor::Cursor {
+                state.current_mut().editor.move_to(text_editor::Cursor {
                     position: text_editor::Position { line, column: 0 },
                     selection: None,
                 });

@@ -8,7 +8,6 @@ mod footer;
 mod formatting;
 mod groups;
 mod handbook;
-mod images;
 mod navigation;
 mod outline;
 mod reading;

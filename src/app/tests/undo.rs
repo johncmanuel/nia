@@ -59,42 +59,6 @@ fn history_is_per_document_and_undo_restores_clean_state() {
 }
 
 #[test]
-fn image_block_edit_undo_restores_source_and_blocks() {
-    let mut document = Document::new();
-    document.edit("Before\n![photo](image.png)\nAfter".into());
-    let mut app = blank();
-    app.tabs[0] = Tab::new(0, document);
-    app.tabs[0].move_image_cursor(text_editor::Cursor {
-        position: text_editor::Position { line: 2, column: 5 },
-        selection: None,
-    });
-    let block = app.current().active_image_block;
-    let _ = update(
-        &mut app,
-        Message::EditImageBlock(0, block, Action::Edit(Edit::Insert('X'))),
-    );
-    let _ = update(
-        &mut app,
-        Message::EditImageBlock(0, block, Action::Edit(Edit::Insert('Y'))),
-    );
-    assert_eq!(
-        app.current().editor.text(),
-        "Before\n![photo](image.png)\nAfterXY"
-    );
-    let _ = update(&mut app, Message::Undo);
-    assert_eq!(
-        app.current().editor.text(),
-        "Before\n![photo](image.png)\nAfter"
-    );
-    assert_eq!(app.current().image_blocks[block].content.text(), "After");
-    let _ = update(&mut app, Message::Redo);
-    assert_eq!(
-        app.current().editor.text(),
-        "Before\n![photo](image.png)\nAfterXY"
-    );
-}
-
-#[test]
 fn auto_pair_is_one_undo_step() {
     let mut app = blank();
     let _ = update(&mut app, Message::Edit(0, Action::Edit(Edit::Insert('('))));

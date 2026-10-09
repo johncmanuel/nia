@@ -1,8 +1,8 @@
 use super::{Fence, atx_heading, closes_fence, fenced_start, setext_level};
 use crate::focus::Span;
+use iced::Theme;
 use iced::advanced::text::highlighter;
 use iced::widget::text;
-use iced::{Font, Theme, font};
 use std::ops::Range;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -11,8 +11,6 @@ pub(crate) enum Kind {
     Marker,
     Quote,
     Code,
-    Emphasis,
-    Strong,
     Link,
     Current,
     Dim,
@@ -20,7 +18,6 @@ pub(crate) enum Kind {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct HighlightSettings {
-    pub(crate) font: Font,
     pub(crate) active_line: Option<usize>,
     pub(crate) focus: Option<Span>,
     pub(crate) highlight_line: bool,
@@ -35,7 +32,7 @@ pub(crate) struct MarkdownHighlighter {
 
 impl text::Highlighter for MarkdownHighlighter {
     type Settings = HighlightSettings;
-    type Highlight = (Kind, Font);
+    type Highlight = Kind;
     type Iterator<'a> = std::vec::IntoIter<(Range<usize>, Self::Highlight)>;
 
     fn new(settings: &HighlightSettings) -> Self {
@@ -47,9 +44,7 @@ impl text::Highlighter for MarkdownHighlighter {
         }
     }
     fn update(&mut self, settings: &HighlightSettings) {
-        let first = if self.settings.font != settings.font
-            || self.settings.focus.is_some() != settings.focus.is_some()
-        {
+        let first = if self.settings.focus.is_some() != settings.focus.is_some() {
             0
         } else {
             [self.settings.active_line, settings.active_line]
@@ -138,11 +133,7 @@ impl text::Highlighter for MarkdownHighlighter {
             }
         }
         self.fences_after.push(self.fence);
-        ranges
-            .into_iter()
-            .map(|(range, kind)| (range, (kind, self.settings.font)))
-            .collect::<Vec<_>>()
-            .into_iter()
+        ranges.into_iter()
     }
 }
 
@@ -158,12 +149,6 @@ fn inline_ranges(line: &str, mut index: usize) -> Vec<(Range<usize>, Kind)> {
                     .find(')')
                     .map(|end| (middle + end + 3, Kind::Link))
             })
-        } else if let Some(after) = rest.strip_prefix("**").or_else(|| rest.strip_prefix("__")) {
-            let marker = &rest[..2];
-            after.find(marker).map(|end| (end + 4, Kind::Strong))
-        } else if let Some(after) = rest.strip_prefix('*').or_else(|| rest.strip_prefix('_')) {
-            let marker = &rest[..1];
-            after.find(marker).map(|end| (end + 2, Kind::Emphasis))
         } else {
             None
         };
@@ -177,7 +162,7 @@ fn inline_ranges(line: &str, mut index: usize) -> Vec<(Range<usize>, Kind)> {
     ranges
 }
 
-pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlighter::Format<Font> {
+pub(crate) fn format(kind: &Kind, theme: &Theme) -> highlighter::Format<iced::Font> {
     let palette = theme.palette();
     if matches!(kind, Kind::Current | Kind::Dim) {
         return highlighter::Format {
@@ -189,21 +174,15 @@ pub(crate) fn format((kind, base_font): &(Kind, Font), theme: &Theme) -> highlig
             font: None,
         };
     }
-    let (color, weight) = match kind {
-        Kind::Heading => (palette.primary, font::Weight::Bold),
-        Kind::Marker | Kind::Quote => (palette.text.scale_alpha(0.58), font::Weight::Normal),
-        Kind::Code => (palette.success, font::Weight::Normal),
-        Kind::Emphasis => (palette.text, font::Weight::Medium),
-        Kind::Strong => (palette.text, font::Weight::Bold),
-        Kind::Link => (palette.primary, font::Weight::Normal),
+    let color = match kind {
+        Kind::Heading | Kind::Link => palette.primary,
+        Kind::Marker | Kind::Quote => palette.text.scale_alpha(0.58),
+        Kind::Code => palette.success,
         Kind::Current | Kind::Dim => unreachable!(),
     };
     highlighter::Format {
         color: Some(color),
-        font: Some(Font {
-            weight,
-            ..*base_font
-        }),
+        font: None,
     }
 }
 

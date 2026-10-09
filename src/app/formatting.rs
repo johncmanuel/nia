@@ -209,13 +209,7 @@ pub(super) fn insert(state: &mut App, format: Format) -> Task<Message> {
     state.show_format_menu = false;
     state.current_mut().reading = None;
     let tab = state.current();
-    let content = if tab.image_blocks.is_empty() {
-        &tab.editor
-    } else {
-        tab.image_blocks
-            .get(tab.active_image_block)
-            .map_or(&tab.editor, |block| &block.content)
-    };
+    let content = &tab.editor;
     let selection = content.selection();
     let (mut replacement, mut move_left) = if format == Format::Footnote {
         let label = next_footnote_label(&tab.editor.text());
@@ -240,15 +234,7 @@ pub(super) fn insert(state: &mut App, format: Format) -> Task<Message> {
         }
     }
     let id = tab.id;
-    let message = if tab.image_blocks.is_empty() {
-        Message::Edit(id, Action::Edit(Edit::Paste(Arc::new(replacement))))
-    } else {
-        Message::EditImageBlock(
-            id,
-            tab.active_image_block,
-            Action::Edit(Edit::Paste(Arc::new(replacement))),
-        )
-    };
+    let message = Message::Edit(id, Action::Edit(Edit::Paste(Arc::new(replacement))));
     let task = update(state, message);
     for _ in 0..move_left {
         state
@@ -256,8 +242,6 @@ pub(super) fn insert(state: &mut App, format: Format) -> Task<Message> {
             .editor
             .perform(Action::Move(Motion::Left));
     }
-    let cursor = state.current().editor.cursor();
-    state.current_mut().move_image_cursor(cursor);
     Task::batch([task, operation::focus(EDITOR)])
 }
 

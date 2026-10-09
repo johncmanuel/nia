@@ -1,5 +1,4 @@
 use super::{Fence, atx_heading, closes_fence, fenced_start, setext_level};
-use crate::focus::Span;
 use iced::Theme;
 use iced::advanced::text::highlighter;
 use iced::widget::text;
@@ -13,13 +12,11 @@ pub(crate) enum Kind {
     Code,
     Link,
     Current,
-    Dim,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct HighlightSettings {
     pub(crate) active_line: Option<usize>,
-    pub(crate) focus: Option<Span>,
     pub(crate) highlight_line: bool,
 }
 
@@ -44,23 +41,11 @@ impl text::Highlighter for MarkdownHighlighter {
         }
     }
     fn update(&mut self, settings: &HighlightSettings) {
-        let first = if self.settings.focus.is_some() != settings.focus.is_some() {
-            0
-        } else {
-            [self.settings.active_line, settings.active_line]
-                .into_iter()
-                .flatten()
-                .chain(
-                    [
-                        self.settings.focus.map(|span| span.start.line),
-                        settings.focus.map(|span| span.start.line),
-                    ]
-                    .into_iter()
-                    .flatten(),
-                )
-                .min()
-                .unwrap_or(0)
-        };
+        let first = [self.settings.active_line, settings.active_line]
+            .into_iter()
+            .flatten()
+            .min()
+            .unwrap_or(0);
         self.change_line(first);
         self.settings = *settings;
     }
@@ -120,18 +105,6 @@ impl text::Highlighter for MarkdownHighlighter {
         if self.settings.highlight_line && self.settings.active_line == Some(line_index) {
             ranges.push((0..line.len(), Kind::Current));
         }
-        if let Some(focus) = self.settings.focus {
-            if line_index < focus.start.line || line_index > focus.end.line {
-                ranges.push((0..line.len(), Kind::Dim));
-            } else {
-                if line_index == focus.start.line && focus.start.byte > 0 {
-                    ranges.push((0..focus.start.byte.min(line.len()), Kind::Dim));
-                }
-                if line_index == focus.end.line && focus.end.byte < line.len() {
-                    ranges.push((focus.end.byte..line.len(), Kind::Dim));
-                }
-            }
-        }
         self.fences_after.push(self.fence);
         ranges.into_iter()
     }
@@ -164,13 +137,9 @@ fn inline_ranges(line: &str, mut index: usize) -> Vec<(Range<usize>, Kind)> {
 
 pub(crate) fn format(kind: &Kind, theme: &Theme) -> highlighter::Format<iced::Font> {
     let palette = theme.palette();
-    if matches!(kind, Kind::Current | Kind::Dim) {
+    if matches!(kind, Kind::Current) {
         return highlighter::Format {
-            color: Some(match kind {
-                Kind::Current => palette.primary,
-                Kind::Dim => palette.text.scale_alpha(0.25),
-                _ => unreachable!(),
-            }),
+            color: Some(palette.primary),
             font: None,
         };
     }
@@ -178,7 +147,7 @@ pub(crate) fn format(kind: &Kind, theme: &Theme) -> highlighter::Format<iced::Fo
         Kind::Heading | Kind::Link => palette.primary,
         Kind::Marker | Kind::Quote => palette.text.scale_alpha(0.58),
         Kind::Code => palette.success,
-        Kind::Current | Kind::Dim => unreachable!(),
+        Kind::Current => unreachable!(),
     };
     highlighter::Format {
         color: Some(color),

@@ -146,7 +146,7 @@ pub(crate) enum Message {
     ShowEditor,
     ToggleZen,
     SetHighlightLine(bool),
-    SetDimming(focus::Dimming),
+    SetInactivePaneDim(u8),
     ToggleReading,
     CopyLink(String),
     RecordShortcut(Slot),

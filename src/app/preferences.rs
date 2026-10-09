@@ -19,8 +19,8 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             state.focus.highlight_line = enabled;
             save_focus(state);
         }
-        Message::SetDimming(dimming) => {
-            state.focus.dimming = dimming;
+        Message::SetInactivePaneDim(dim) => {
+            state.focus.inactive_pane_dim = dim.min(100);
             save_focus(state);
         }
         Message::RecordShortcut(slot) => {

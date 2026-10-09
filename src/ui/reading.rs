@@ -18,6 +18,9 @@ pub(super) fn reading_view<'a>(state: &'a App, tab: &'a Tab) -> Element<'a, Mess
             .width(Length::Fill)
             .max_width(760),
     )
+    .direction(scrollable::Direction::Vertical(
+        scrollable::Scrollbar::hidden(),
+    ))
     .width(Length::Fill)
     .height(Length::Fill)
     .into()

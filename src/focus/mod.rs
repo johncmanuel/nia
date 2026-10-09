@@ -3,21 +3,9 @@ use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 
-const DEFAULT_INACTIVE_PANE_DIM: u8 = 35;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Settings {
     pub(crate) highlight_line: bool,
-    pub(crate) inactive_pane_dim: u8,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            highlight_line: false,
-            inactive_pane_dim: DEFAULT_INACTIVE_PANE_DIM,
-        }
-    }
 }
 
 impl Settings {
@@ -33,19 +21,8 @@ impl Settings {
         };
         let invalid = || io::Error::new(ErrorKind::InvalidData, "invalid focus settings");
         let parts: Vec<_> = value.lines().collect();
-        let (highlight, dim) = match parts.as_slice() {
-            [highlight] => (*highlight, DEFAULT_INACTIVE_PANE_DIM),
-            [highlight, "Off" | "Paragraph" | "Sentence"] => {
-                (*highlight, DEFAULT_INACTIVE_PANE_DIM)
-            }
-            [highlight, dim] => (
-                *highlight,
-                dim.parse::<u8>()
-                    .ok()
-                    .filter(|dim| *dim <= 100)
-                    .ok_or_else(invalid)?,
-            ),
-            [_, highlight, _, _, _] => (*highlight, DEFAULT_INACTIVE_PANE_DIM),
+        let highlight = match parts.as_slice() {
+            [highlight] | [highlight, _] | [_, highlight, _, _, _] => *highlight,
             _ => return Err(invalid()),
         };
         let highlight_line = match highlight {
@@ -53,10 +30,7 @@ impl Settings {
             "false" => false,
             _ => return Err(invalid()),
         };
-        Ok(Self {
-            highlight_line,
-            inactive_pane_dim: dim,
-        })
+        Ok(Self { highlight_line })
     }
 
     pub(crate) fn save(self) -> io::Result<()> {
@@ -68,10 +42,7 @@ impl Settings {
             io::Error::new(ErrorKind::InvalidInput, "invalid focus settings path")
         })?;
         fs::create_dir_all(parent)?;
-        fs::write(
-            path,
-            format!("{}\n{}\n", self.highlight_line, self.inactive_pane_dim),
-        )
+        fs::write(path, format!("{}\n", self.highlight_line))
     }
 }
 

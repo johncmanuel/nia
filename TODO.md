@@ -6,7 +6,7 @@
 - [ ] Verify the first GitHub Actions build and tagged release on Linux, Windows, and both macOS architectures after pushing the workflow.
 - [ ] Verify that the first merge into `master` after the workflow update publishes a GitHub prerelease with four native archives and checksums.
 - [ ] On macOS, verify tab group switching and Primary+Shift+W group closing with clean and unsaved documents in multiple splits. Check save, discard, and cancel paths.
-- [ ] On macOS, verify pane dragging and resizing, inactive split dimming and its saved strength, restored groups and layouts after relaunch, the last selected group, each tab's Read or Write mode, long tab titles, and long outline headings. Check outline toggling by mouse and shortcut.
+- [ ] On macOS, verify pane dragging and resizing, restored groups and layouts after relaunch, the last selected group, each tab's Read or Write mode, long tab titles, and long outline headings. Check outline toggling by mouse and shortcut.
 - [ ] On macOS, reopen one file in two splits. Verify typing, cursor and scroll positions, undo, save, close prompts, and relaunch with a large document.
 - [ ] On macOS, verify typing responsiveness, all-tabs search, installed fonts, wallpaper transparency and opacity adjustment, and the F12 Iced debug overlay. Headless `iced_test` interactions pass.
 

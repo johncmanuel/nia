@@ -56,11 +56,9 @@ fn settings_page_has_font_and_keybindings_controls() {
     }
     ui.find("Font").expect("font heading visible");
     ui.find("Monospace").expect("font reset visible");
-    let dim_label = format!("Inactive split dimming: {}%", app.focus.inactive_pane_dim);
-    ui.find(dim_label.as_str())
-        .expect("inactive split dimming control visible");
     ui.find("Keybindings").expect("shortcuts visible");
     assert!(ui.find("Dim unfocused").is_err());
+    assert!(ui.find("Inactive split dimming").is_err());
     ui.find("Open source credits")
         .expect("credits visible in settings");
     ui.find("Iced - interface (MIT)")
@@ -92,21 +90,6 @@ fn settings_page_has_font_and_keybindings_controls() {
         ui.into_messages()
             .into_iter()
             .any(|message| matches!(message, Message::SetBackgroundOpacity(_)))
-    );
-    let mut ui = simulator(crate::ui::view(&app));
-    let label = ui
-        .find(dim_label.as_str())
-        .expect("dimming slider visible")
-        .bounds();
-    ui.point_at(iced::Point::new(
-        label.x + 40.0,
-        label.y + label.height + 24.0,
-    ));
-    ui.simulate(iced_test::simulator::click());
-    assert!(
-        ui.into_messages()
-            .into_iter()
-            .any(|message| matches!(message, Message::SetInactivePaneDim(_)))
     );
 }
 

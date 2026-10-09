@@ -61,7 +61,7 @@ On macOS and Linux, select **Transparent background** to see the desktop through
 
 Press Primary+Shift+J or select **Zen mode** in Settings to hide the footer and tab bar. Open panes, the outline, and search stay visible. Press Escape to show the controls again.
 
-In Settings, select **Highlight current line** to show the active line with a different color. In a split layout, inactive panes appear dim so you can find the active pane. Adjust **Inactive split dimming** to change this effect. Set it to 0% to turn it off.
+In Settings, select **Highlight current line** to show the active line with a different color.
 
 ## Use keyboard shortcuts
 

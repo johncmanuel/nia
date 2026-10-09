@@ -70,7 +70,6 @@ impl App {
                 let cursor = tab.editor.cursor();
                 tab.editor = text_editor::Content::with_text(&document.contents);
                 tab.editor.move_to(cursor);
-                tab.rebuild_image_blocks();
                 tab.refresh_reading();
                 tab.history.clear();
             }
@@ -95,14 +94,6 @@ impl App {
             .enumerate()
             .any(|(index, tab)| index != source && tab.document.path.as_ref() == Some(&path))
         {
-            return;
-        }
-        if !self.tabs[source].image_blocks.is_empty()
-            || self.tabs.iter().any(|tab| {
-                tab.document.path.as_ref() == Some(&path) && !tab.image_blocks.is_empty()
-            })
-        {
-            self.sync_shared_views(source, true);
             return;
         }
         let revision = self.tabs[source].document.revision;

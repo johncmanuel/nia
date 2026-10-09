@@ -4,7 +4,6 @@ use iced::widget::text::Highlighter;
 #[test]
 fn highlights_markdown_without_treating_fenced_headings_as_headings() {
     let settings = HighlightSettings {
-        font: Font::MONOSPACE,
         active_line: None,
         focus: None,
         highlight_line: false,
@@ -12,40 +11,31 @@ fn highlights_markdown_without_treating_fenced_headings_as_headings() {
     let mut highlighter = MarkdownHighlighter::new(&settings);
     assert_eq!(
         highlighter.highlight_line("# Title").collect::<Vec<_>>(),
-        vec![(0..7, (Kind::Heading, Font::MONOSPACE))]
+        vec![(0..7, Kind::Heading)]
     );
     assert_eq!(
         highlighter.highlight_line("```md").collect::<Vec<_>>(),
-        vec![(0..5, (Kind::Code, Font::MONOSPACE))]
+        vec![(0..5, Kind::Code)]
     );
     assert_eq!(
         highlighter.highlight_line("# source").collect::<Vec<_>>(),
-        vec![(0..8, (Kind::Code, Font::MONOSPACE))]
+        vec![(0..8, Kind::Code)]
     );
     highlighter.change_line(1);
     assert_eq!(
         highlighter
             .highlight_line("plain *word* [link](url)")
             .collect::<Vec<_>>(),
-        vec![
-            (6..12, (Kind::Emphasis, Font::MONOSPACE)),
-            (13..24, (Kind::Link, Font::MONOSPACE))
-        ]
+        vec![(13..24, Kind::Link)]
     );
-    let font = Font::with_name("Example Family");
-    highlighter.update(&HighlightSettings { font, ..settings });
     let highlighted = highlighter.highlight_line("# Font").collect::<Vec<_>>();
-    assert_eq!(highlighted[0].1.1, font);
-    assert_eq!(
-        format(&highlighted[0].1, &Theme::Dark).font.unwrap().family,
-        font.family
-    );
+    assert_eq!(highlighted[0], (0..6, Kind::Heading));
+    assert!(format(&highlighted[0].1, &Theme::Dark).font.is_none());
 }
 
 #[test]
 fn focus_dimming_does_not_hide_other_lines() {
     let settings = HighlightSettings {
-        font: Font::MONOSPACE,
         active_line: Some(0),
         focus: Some(crate::focus::Span {
             start: crate::focus::Point { line: 0, byte: 6 },
@@ -55,8 +45,8 @@ fn focus_dimming_does_not_hide_other_lines() {
     };
     let mut highlighter = MarkdownHighlighter::new(&settings);
     let first = highlighter.highlight_line("hello word").collect::<Vec<_>>();
-    assert!(first.contains(&(0..10, (Kind::Current, Font::MONOSPACE))));
-    assert!(first.contains(&(0..6, (Kind::Dim, Font::MONOSPACE))));
+    assert!(first.contains(&(0..10, Kind::Current)));
+    assert!(first.contains(&(0..6, Kind::Dim)));
     let second = highlighter.highlight_line("outside").collect::<Vec<_>>();
     assert!(
         second.iter().all(|(_, highlight)| {
@@ -71,7 +61,6 @@ fn focus_dimming_does_not_hide_other_lines() {
 #[test]
 fn removing_focus_rehighlights_lines_before_the_old_focus() {
     let focused = HighlightSettings {
-        font: Font::MONOSPACE,
         active_line: Some(2),
         focus: Some(crate::focus::Span {
             start: crate::focus::Point { line: 2, byte: 0 },
@@ -83,7 +72,7 @@ fn removing_focus_rehighlights_lines_before_the_old_focus() {
     assert!(
         highlighter
             .highlight_line("dimmed")
-            .any(|(_, (kind, _))| kind == Kind::Dim)
+            .any(|(_, kind)| kind == Kind::Dim)
     );
     highlighter.highlight_line("dimmed").for_each(drop);
     highlighter.highlight_line("focus").for_each(drop);
@@ -97,6 +86,6 @@ fn removing_focus_rehighlights_lines_before_the_old_focus() {
     assert!(
         highlighter
             .highlight_line("visible")
-            .all(|(_, (kind, _))| kind != Kind::Dim)
+            .all(|(_, kind)| kind != Kind::Dim)
     );
 }

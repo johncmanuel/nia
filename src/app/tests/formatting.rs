@@ -101,58 +101,41 @@ fn typed_pairs_skip_closers_and_delete_together() {
 }
 
 #[test]
-fn formatting_and_pairs_keep_image_blocks_in_sync() {
+fn formatting_and_pairs_keep_image_source_editable() {
     let mut document = Document::new();
     document.edit("![photo](image.png)\nAfter".into());
     let mut app = blank();
     app.tabs[0] = Tab::new(0, document);
-    app.tabs[0].move_image_cursor(Cursor {
+    app.tabs[0].editor.move_to(Cursor {
         position: Position { line: 1, column: 5 },
         selection: None,
     });
-    let block = app.tabs[0].active_image_block;
     let _ = update(&mut app, Message::Format(Format::Bold));
     assert_eq!(
         app.current().editor.text(),
         "![photo](image.png)\nAfter****"
     );
-    assert_eq!(
-        app.current().image_blocks[block].content.text(),
-        "After****"
-    );
-    let _ = update(
-        &mut app,
-        Message::EditImageBlock(0, block, Action::Edit(Edit::Insert('('))),
-    );
+    let _ = update(&mut app, Message::Edit(0, Action::Edit(Edit::Insert('('))));
     assert_eq!(
         app.current().editor.text(),
         "![photo](image.png)\nAfter**()**"
     );
-    assert_eq!(
-        app.current().image_blocks[block].content.text(),
-        "After**()**"
-    );
 }
 
 #[test]
-fn formatting_selected_text_after_an_image_keeps_source_and_preview_in_sync() {
+fn formatting_selected_text_after_an_image_keeps_source() {
     let mut document = Document::new();
     document.edit("![photo](image.png)\nAfter".into());
     let mut app = blank();
     app.tabs[0] = Tab::new(0, document);
-    app.tabs[0].move_image_cursor(Cursor {
+    app.tabs[0].editor.move_to(Cursor {
         position: Position { line: 1, column: 5 },
         selection: Some(Position { line: 1, column: 0 }),
     });
-    let block = app.tabs[0].active_image_block;
     let _ = update(&mut app, Message::Format(Format::Bold));
     assert_eq!(
         app.current().editor.text(),
         "![photo](image.png)\n**After**"
-    );
-    assert_eq!(
-        app.current().image_blocks[block].content.text(),
-        "**After**"
     );
 }
 

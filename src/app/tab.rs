@@ -1,4 +1,4 @@
-use super::{ImageBlock, history::History};
+use super::history::History;
 use crate::{document::Document, recovery};
 use iced::widget::{markdown, text_editor};
 use std::time::Instant;
@@ -8,8 +8,6 @@ pub(crate) struct Tab {
     pub(crate) document: Document,
     pub(crate) editor: text_editor::Content,
     pub(super) history: History,
-    pub(crate) image_blocks: Vec<ImageBlock>,
-    pub(crate) active_image_block: usize,
     pub(crate) reading: Option<markdown::Content>,
     pub(crate) saving: bool,
     pub(crate) checking: bool,
@@ -25,15 +23,12 @@ pub(crate) struct Tab {
 
 impl Tab {
     pub(super) fn new(id: u64, document: Document) -> Self {
-        let has_image_marker = document.contents.contains("![");
         let editor = text_editor::Content::with_text(&document.contents);
-        let mut tab = Self {
+        Self {
             id,
             document,
             editor,
             history: History::default(),
-            image_blocks: Vec::new(),
-            active_image_block: 0,
             reading: None,
             saving: false,
             checking: false,
@@ -45,11 +40,7 @@ impl Tab {
             last_edit: None,
             last_save_failure: None,
             last_checked: None,
-        };
-        if has_image_marker {
-            tab.rebuild_image_blocks();
         }
-        tab
     }
 
     pub(super) fn recovered(id: u64, draft: recovery::Draft) -> Self {

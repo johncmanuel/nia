@@ -29,7 +29,7 @@ Snapshot tests also read these variables. Set a snapshot variable to a writable 
 | `NIA_GROUP_SNAPSHOT` | Tab groups |
 | `NIA_READING_SNAPSHOT` | Reading mode |
 | `NIA_IMAGE_SNAPSHOT` | Image in reading mode |
-| `NIA_INLINE_IMAGE_SNAPSHOT` | Image while writing |
+| `NIA_SOURCE_IMAGE_SNAPSHOT` | Image Markdown in the source editor |
 | `NIA_OPENED_SNAPSHOT` | Opened document |
 | `NIA_SETTINGS_SNAPSHOT` | Settings |
 | `NIA_THEME_SNAPSHOT` | Theme menu |

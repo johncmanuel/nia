@@ -234,17 +234,12 @@ fn image_source_edits_update_the_other_view() {
             Message::Opened(Ok(Document::open(path.clone()).expect("open file"))),
         );
     }
-    assert!(!app.tabs[0].image_blocks.is_empty());
     let second = app.tabs[1].id;
     let _ = update(
         &mut app,
-        Message::EditImageBlock(second, 1, Action::Edit(Edit::Insert('x'))),
+        Message::Edit(second, Action::Edit(Edit::Insert('x'))),
     );
     assert_eq!(app.tabs[0].editor.text(), app.tabs[1].editor.text());
-    assert_eq!(
-        app.tabs[0].image_blocks.len(),
-        app.tabs[1].image_blocks.len()
-    );
     fs::remove_file(path).expect("remove test document");
 }
 

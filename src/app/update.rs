@@ -1,10 +1,9 @@
 use super::{
-    App, CloseTarget, EDITOR, Message, Tab, formatting, image_blocks, keyboard, lifecycle,
-    overlays, preferences,
+    App, CloseTarget, EDITOR, Message, Tab, formatting, keyboard, lifecycle, overlays, preferences,
 };
 use crate::document::Document;
 use iced::Task;
-use iced::widget::{operation, pane_grid, text_editor};
+use iced::widget::{operation, pane_grid};
 use std::time::Instant;
 
 pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
@@ -27,13 +26,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             let tab = state.current_mut();
             let before = tab.editor.cursor();
             let pending = tab.history.begin(&tab.editor, &action);
-            let had_image_blocks = !tab.image_blocks.is_empty();
             let auto = formatting::auto_edit(&tab.editor, &action);
-            let skipped_image_close = matches!(auto, Some(formatting::AutoEdit::SkipCloser))
-                && matches!(
-                    action,
-                    text_editor::Action::Edit(text_editor::Edit::Insert(')'))
-                );
             let mut actions = Vec::new();
             let changed = if let Some(auto) = auto {
                 auto.perform(|action| {
@@ -45,84 +38,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 actions.push(action.clone());
                 action.is_edit()
             };
-            let image_structure = image_blocks::changes_image_structure(&action);
-            let pasted_image = matches!(&action, text_editor::Action::Edit(text_editor::Edit::Paste(text)) if text.contains("!["));
-            if skipped_image_close {
-                tab.rebuild_image_blocks();
-            }
             if changed {
-                tab.history.finish(&tab.editor, pending);
-                let line = tab.editor.cursor().position.line;
-                if image_structure
-                    && (pasted_image
-                        || [line, line.saturating_sub(1)].into_iter().any(|line| {
-                            tab.editor
-                                .line(line)
-                                .is_some_and(|line| line.text.contains("!["))
-                        }))
-                {
-                    tab.rebuild_image_blocks();
-                }
-                tab.refresh_reading();
-                tab.document.mark_edited();
-                tab.last_edit = Some(Instant::now());
-                state.mirror_edit(index, before, &actions);
-                if state.show_search && state.search_all_tabs {
-                    state.refresh_tab_search();
-                } else {
-                    state.refresh_search();
-                }
-                state.search_index = None;
-                state.notice = None;
-                state.show_format_menu = false;
-            }
-            if had_image_blocks != !state.current().image_blocks.is_empty() {
-                return operation::focus(EDITOR);
-            }
-        }
-        Message::EditImageBlock(id, block, action) => {
-            if state.loading || state.dialog_open {
-                return Task::none();
-            }
-            let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
-                return Task::none();
-            };
-            if index != state.active {
-                state.current_mut().history.break_group();
-                state.tabs[index].history.break_group();
-            }
-            state.active = index;
-            if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
-                state.active_pane = pane;
-            }
-            state.current_mut().activate_image_block(block);
-            let tab = state.current_mut();
-            let before = tab.editor.cursor();
-            let pending = tab.history.begin(&tab.editor, &action);
-            let auto = state
-                .current()
-                .image_blocks
-                .get(block)
-                .and_then(|image| formatting::auto_edit(&image.content, &action));
-            let mut actions = Vec::new();
-            let changed = if let Some(auto) = auto {
-                auto.perform(|action| {
-                    state
-                        .current_mut()
-                        .perform_image_action(block, action.clone());
-                    actions.push(action);
-                })
-            } else {
-                let changed = state
-                    .current_mut()
-                    .perform_image_action(block, action.clone());
-                actions.push(action.clone());
-                changed
-            };
-            let moved_block = state.current().active_image_block != block;
-            let removed_image_blocks = state.current().image_blocks.is_empty();
-            if changed {
-                let tab = state.current_mut();
                 tab.history.finish(&tab.editor, pending);
                 tab.refresh_reading();
                 tab.document.mark_edited();
@@ -137,24 +53,6 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 state.notice = None;
                 state.show_format_menu = false;
             }
-            if moved_block
-                || removed_image_blocks
-                || matches!(action, text_editor::Action::Click(_))
-            {
-                return operation::focus(EDITOR);
-            }
-        }
-        Message::ActivateImageBlock(id, block) => {
-            let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
-                return Task::none();
-            };
-            state.active = index;
-            if let Some((&pane, _)) = state.panes.iter().find(|(_, tab_id)| **tab_id == id) {
-                state.active_pane = pane;
-            }
-            state.current_mut().history.break_group();
-            state.current_mut().activate_image_block(block);
-            return operation::focus(EDITOR);
         }
         Message::ToggleFormatMenu => {
             state.show_format_menu = !state.show_format_menu;
@@ -385,7 +283,6 @@ fn restore_edit(state: &mut App, message: Message) -> Task<Message> {
     if !restored {
         return Task::none();
     }
-    tab.rebuild_image_blocks();
     tab.refresh_reading();
     tab.document.mark_edited();
     tab.sync_document();

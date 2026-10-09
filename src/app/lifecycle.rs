@@ -210,7 +210,6 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                         tab.document.reload(contents);
                         tab.editor = text_editor::Content::with_text(&tab.document.contents);
                         tab.history.clear();
-                        tab.rebuild_image_blocks();
                         tab.refresh_reading();
                         tab.conflict = false;
                         text_changed = true;

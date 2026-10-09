@@ -10,7 +10,6 @@ use std::time::Instant;
 mod file_failure;
 mod formatting;
 mod history;
-mod image_blocks;
 mod keyboard;
 mod layout;
 mod lifecycle;
@@ -27,7 +26,6 @@ mod update;
 
 use file_failure::FileFailure;
 pub(crate) use formatting::Format;
-use image_blocks::ImageBlock;
 pub(crate) use session::save_session;
 #[cfg(test)]
 pub(crate) use startup::blank;
@@ -107,8 +105,6 @@ pub(crate) enum CloseTarget {
 #[derive(Clone, Debug)]
 pub(crate) enum Message {
     Edit(u64, text_editor::Action),
-    EditImageBlock(u64, usize, text_editor::Action),
-    ActivateImageBlock(u64, usize),
     ToggleFormatMenu,
     Format(Format),
     Undo,

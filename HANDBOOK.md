@@ -19,11 +19,11 @@ After a short pause, nia saves changes to a named file. The footer shows the sav
 
 nia starts with one tab group and one writing pane. Press Primary+T to make a new tab group with one blank document. Each group has its own pane layout. The small tab bar appears when you have more than one group. Select a tab in the bar or press Primary+1 to Primary+9 to change groups.
 
-Press Primary+W to close the active document. If it is the last document in its group, nia closes the group. If you close a document with unsaved changes, nia asks you to save, discard, or cancel. nia also asks this question when you quit.
+Press Primary+W to close the active document. If it is the last document in its group, nia closes the group. If you close the last view of a document with unsaved changes, nia asks you to save, discard, or cancel. nia also asks this question when you quit.
 
 Press Ctrl+Shift+L to show one pane in the current group. Press Primary+D to add a new document in a pane on the right. Press Primary+Shift+D to add a new document in a pane below. Press Primary+] or Primary+[ to move between panes in the current group.
 
-Select a pane to work in its document. Press Primary+N to make a new document group. Opening a file also makes a group when another document is open.
+Select a pane to work in its document. Press Primary+N to make a new document group. Opening a different file makes a group when another document is open. To show the same file in two panes, open it again. If the active pane is empty, nia puts the file in that pane. If it is not empty, nia adds a pane on the right. Changes in one pane appear in the other pane.
 
 Drag a pane by its title bar to move it. Drag the line between panes to change their sizes. Select the close button on a pane to hide that pane. This action keeps its document open. nia restores the groups, open documents, and pane layouts when you start it again.
 

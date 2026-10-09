@@ -7,6 +7,7 @@
 - [ ] On macOS, verify tab group switching and Primary+Shift+W group closing with clean and unsaved documents in multiple splits. Check save, discard, and cancel paths.
 - [ ] On macOS, verify pane dragging and resizing, restored groups and layouts after relaunch, long tab titles, and long outline headings. Check outline toggling by mouse and shortcut.
 - [ ] On macOS, verify inline image editing and large image previews in a narrow split. Check that images remain within the writing pane and that text around them is editable.
+- [ ] On macOS, reopen one file in two splits. Verify typing, cursor and scroll positions, undo, save, close prompts, and relaunch with a large document.
 - [ ] On macOS, verify typing responsiveness, all-tabs search, installed fonts, wallpaper transparency and opacity adjustment, and the F12 Iced debug overlay. Headless `iced_test` interactions pass.
 
 ## Editor improvements

@@ -46,7 +46,9 @@ cargo test
 
 ## Builds and releases
 
-The [build workflow](.github/workflows/build.yml) checks Linux, Windows, Intel macOS, and Apple Silicon macOS. Each push to `master`, including a squash merge, builds native archives and publishes a GitHub prerelease after all targets pass. A version tag matching the stable `X.Y.Z` version in `Cargo.toml` publishes a stable release. Manual workflow runs build downloadable archives without publishing a release. Update `Cargo.lock` with release version changes before tagging.
+The [build workflow](.github/workflows/build.yml) checks Linux, Windows, Intel macOS, and Apple Silicon macOS. Each push to `master`, including a squash merge, builds native archives and publishes a GitHub prerelease after all targets pass. A version tag matching the stable `X.Y.Z` version in `Cargo.toml` publishes a stable release marked **Latest**. Manual workflow runs build downloadable archives without publishing a release. Update `Cargo.lock` with release version changes before tagging.
+
+For the first stable release, merge and verify the release commit on `master`, then create and push the `v0.1.0` tag from that commit. Verify the four archives and their checksums on the published release.
 
 macOS archives include `nia.app` (macOS 11 or later), Windows archives include `nia.exe`, and Linux archives include `nia` (built on Ubuntu 24.04). Extract the archive before launching. The app is not signed or notarized.
 

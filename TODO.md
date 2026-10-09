@@ -2,6 +2,7 @@
 
 ## Before release
 
+- [ ] Merge the final release changes into `master`, confirm its CI checks pass, then tag that commit `v0.1.0` and verify the stable release is marked Latest.
 - [ ] Verify the first GitHub Actions build and tagged release on Linux, Windows, and both macOS architectures after pushing the workflow.
 - [ ] Verify that the first merge into `master` after the workflow update publishes a GitHub prerelease with four native archives and checksums.
 - [ ] On macOS, verify tab group switching and Primary+Shift+W group closing with clean and unsaved documents in multiple splits. Check save, discard, and cancel paths.

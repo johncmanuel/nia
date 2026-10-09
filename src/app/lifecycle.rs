@@ -43,7 +43,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                         .iter()
                         .position(|tab| tab.document.path == document.path)
                     {
-                        state.select_tab(index);
+                        state.open_another_view(index);
                     } else if state.tabs.len() == 1
                         && state.current().document.path.is_none()
                         && !state.current().document.dirty
@@ -125,6 +125,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     state.tabs[index].last_save_failure = None;
                     state.tabs[index].recovered_revision = revision;
                     state.tabs[index].last_recovery_failure = None;
+                    state.sync_shared_views(index, false);
                     if !state.tabs[index].document.dirty
                         && let Err(error) = recovery::remove(&state.tabs[index].recovery_key)
                     {
@@ -154,6 +155,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     {
                         state.tabs[index].conflict = true;
                     }
+                    state.sync_shared_views(index, false);
                     state.notice = Some(error.save_notice());
                 }
             }
@@ -186,9 +188,10 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ExternalChecked(id, path, checked_revision, result) => {
-            let Some(tab) = state.tabs.iter_mut().find(|tab| tab.id == id) else {
+            let Some(index) = state.tabs.iter().position(|tab| tab.id == id) else {
                 return Task::none();
             };
+            let tab = &mut state.tabs[index];
             tab.checking = false;
             if tab.document.path.as_ref() != Some(&path)
                 || tab.document.revision != checked_revision
@@ -196,6 +199,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
             {
                 return Task::none();
             }
+            let mut text_changed = false;
             match result {
                 Ok(contents) if tab.document.saved_contents.as_deref() != Some(&contents) => {
                     if tab.document.dirty {
@@ -209,12 +213,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                         tab.rebuild_image_blocks();
                         tab.refresh_reading();
                         tab.conflict = false;
-                        if state.show_search && state.search_all_tabs {
-                            state.refresh_tab_search();
-                        } else {
-                            state.refresh_search();
-                        }
-                        state.search_index = None;
+                        text_changed = true;
                         state.notice = Some("Reloaded changes from disk.".into());
                     }
                     log::info!("external document change detected");
@@ -233,13 +232,24 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     state.notice = Some(error.external_notice().into());
                 }
             }
+            state.sync_shared_views(index, text_changed);
+            if text_changed {
+                if state.show_search && state.search_all_tabs {
+                    state.refresh_tab_search();
+                } else {
+                    state.refresh_search();
+                }
+                state.search_index = None;
+            }
         }
         Message::Tick(now) => {
             if state.pending_close.is_some() {
                 return Task::none();
             }
-            if let Some(tab) = state.tabs.iter_mut().find(|tab| {
-                tab.document.dirty
+            if let Some(index) = (0..state.tabs.len()).find(|&index| {
+                let tab = &state.tabs[index];
+                state.primary_view(index) == index
+                    && tab.document.dirty
                     && !tab.recovering
                     && tab.recovered_revision != tab.document.revision
                     && tab.last_recovery_failure.is_none_or(|failure| {
@@ -249,6 +259,7 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                         .last_edit
                         .is_some_and(|last| now.duration_since(last) >= Duration::from_millis(500))
             }) {
+                let tab = &mut state.tabs[index];
                 tab.sync_document();
                 if tab.document.dirty {
                     tab.recovering = true;
@@ -272,8 +283,10 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                     log::warn!("recovery cleanup failed: {:?}", error.kind());
                 }
             }
-            if let Some(index) = state.tabs.iter().position(|tab| {
-                tab.document.dirty
+            if let Some(index) = (0..state.tabs.len()).find(|&index| {
+                let tab = &state.tabs[index];
+                state.primary_view(index) == index
+                    && tab.document.dirty
                     && !tab.saving
                     && !tab.conflict
                     && tab.last_save_failure.is_none_or(|failure| {
@@ -288,14 +301,17 @@ pub(super) fn handle(state: &mut App, message: Message) -> Task<Message> {
                 log::debug!("autosave queued");
                 return state.start_save_at(index, path, false);
             }
-            if let Some(tab) = state.tabs.iter_mut().find(|tab| {
-                tab.document.path.is_some()
+            if let Some(index) = (0..state.tabs.len()).find(|&index| {
+                let tab = &state.tabs[index];
+                state.primary_view(index) == index
+                    && tab.document.path.is_some()
                     && !tab.saving
                     && !tab.checking
                     && tab
                         .last_checked
                         .is_none_or(|last| now.duration_since(last) >= Duration::from_secs(3))
             }) {
+                let tab = &mut state.tabs[index];
                 tab.checking = true;
                 tab.last_checked = Some(now);
                 let id = tab.id;

@@ -25,6 +25,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 state.active_pane = pane;
             }
             let tab = state.current_mut();
+            let before = tab.editor.cursor();
             let pending = tab.history.begin(&tab.editor, &action);
             let had_image_blocks = !tab.image_blocks.is_empty();
             let auto = formatting::auto_edit(&tab.editor, &action);
@@ -33,10 +34,15 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                     action,
                     text_editor::Action::Edit(text_editor::Edit::Insert(')'))
                 );
+            let mut actions = Vec::new();
             let changed = if let Some(auto) = auto {
-                auto.perform(|action| tab.editor.perform(action))
+                auto.perform(|action| {
+                    tab.editor.perform(action.clone());
+                    actions.push(action);
+                })
             } else {
                 tab.editor.perform(action.clone());
+                actions.push(action.clone());
                 action.is_edit()
             };
             let image_structure = image_blocks::changes_image_structure(&action);
@@ -60,6 +66,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 tab.refresh_reading();
                 tab.document.mark_edited();
                 tab.last_edit = Some(Instant::now());
+                state.mirror_edit(index, before, &actions);
                 if state.show_search && state.search_all_tabs {
                     state.refresh_tab_search();
                 } else {
@@ -90,20 +97,27 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
             }
             state.current_mut().activate_image_block(block);
             let tab = state.current_mut();
+            let before = tab.editor.cursor();
             let pending = tab.history.begin(&tab.editor, &action);
             let auto = state
                 .current()
                 .image_blocks
                 .get(block)
                 .and_then(|image| formatting::auto_edit(&image.content, &action));
+            let mut actions = Vec::new();
             let changed = if let Some(auto) = auto {
                 auto.perform(|action| {
-                    state.current_mut().perform_image_action(block, action);
+                    state
+                        .current_mut()
+                        .perform_image_action(block, action.clone());
+                    actions.push(action);
                 })
             } else {
-                state
+                let changed = state
                     .current_mut()
-                    .perform_image_action(block, action.clone())
+                    .perform_image_action(block, action.clone());
+                actions.push(action.clone());
+                changed
             };
             let moved_block = state.current().active_image_block != block;
             let removed_image_blocks = state.current().image_blocks.is_empty();
@@ -113,6 +127,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 tab.refresh_reading();
                 tab.document.mark_edited();
                 tab.last_edit = Some(Instant::now());
+                state.mirror_edit(index, before, &actions);
                 if state.show_search && state.search_all_tabs {
                     state.refresh_tab_search();
                 } else {
@@ -219,11 +234,9 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 return Task::none();
             };
             let target = CloseTarget::Group(anchor);
-            if state
-                .tabs
-                .iter()
-                .any(|tab| ids.contains(&tab.id) && tab.document.dirty)
-            {
+            if state.tabs.iter().enumerate().any(|(index, tab)| {
+                ids.contains(&tab.id) && tab.document.dirty && !state.view_survives(index, &ids)
+            }) {
                 log::debug!("group close requires unsaved-change confirmation");
                 state.pending_close = Some(target);
                 return Task::none();
@@ -289,7 +302,9 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
                 return Task::none();
             }
             state.tabs[index].sync_document();
-            if state.tabs[index].document.dirty {
+            if state.tabs[index].document.dirty
+                && !state.view_survives(index, &[state.tabs[index].id])
+            {
                 state.select_tab(index);
                 state.pending_close = Some(CloseTarget::Tab(state.tabs[index].id));
                 return Task::none();
@@ -375,9 +390,12 @@ fn restore_edit(state: &mut App, message: Message) -> Task<Message> {
     tab.document.mark_edited();
     tab.sync_document();
     tab.last_edit = tab.document.dirty.then(Instant::now);
-    if !tab.document.dirty {
-        tab.recovered_revision = tab.document.revision;
-        if let Err(error) = crate::recovery::remove(&tab.recovery_key) {
+    let index = state.active;
+    state.sync_shared_views(index, true);
+    if !state.tabs[index].document.dirty {
+        let primary = state.primary_view(index);
+        state.tabs[primary].recovered_revision = state.tabs[primary].document.revision;
+        if let Err(error) = crate::recovery::remove(&state.tabs[primary].recovery_key) {
             log::warn!("recovery cleanup after undo failed: {:?}", error.kind());
         }
     }

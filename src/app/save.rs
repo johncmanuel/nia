@@ -7,7 +7,8 @@ use std::path::PathBuf;
 
 impl App {
     pub(super) fn save(&mut self) -> Task<Message> {
-        if self.current().saving || self.loading || self.dialog_open {
+        let primary = self.primary_view(self.active);
+        if self.tabs[primary].saving || self.loading || self.dialog_open {
             return Task::none();
         }
         if self.current().conflict {
@@ -17,7 +18,7 @@ impl App {
             return Task::none();
         }
         if let Some(path) = self.current().document.path.clone() {
-            self.start_save_at(self.active, path, false)
+            self.start_save_at(primary, path, false)
         } else {
             self.dialog_open = true;
             Task::perform(
@@ -40,6 +41,11 @@ impl App {
         path: PathBuf,
         as_new: bool,
     ) -> Task<Message> {
+        let index = if as_new {
+            index
+        } else {
+            self.primary_view(index)
+        };
         let tab = &mut self.tabs[index];
         tab.sync_document();
         tab.saving = true;
@@ -85,15 +91,14 @@ impl App {
             }
         }
         let dirty = match target {
-            CloseTarget::Tab(id) => self
-                .tabs
-                .iter()
-                .position(|tab| tab.id == id && tab.document.dirty),
+            CloseTarget::Tab(id) => self.tabs.iter().enumerate().position(|(index, tab)| {
+                tab.id == id && tab.document.dirty && !self.view_survives(index, &[id])
+            }),
             CloseTarget::Group(anchor) => {
                 let ids = self.group_tab_ids(anchor);
-                self.tabs
-                    .iter()
-                    .position(|tab| ids.contains(&tab.id) && tab.document.dirty)
+                self.tabs.iter().enumerate().position(|(index, tab)| {
+                    ids.contains(&tab.id) && tab.document.dirty && !self.view_survives(index, &ids)
+                })
             }
             CloseTarget::Window(_) => self.tabs.iter().position(|tab| tab.document.dirty),
         };
@@ -141,6 +146,7 @@ impl App {
             }
             CloseTarget::Window(_) => (0..self.tabs.len()).collect(),
         };
+        let closing_ids: Vec<_> = indexes.iter().map(|&index| self.tabs[index].id).collect();
         if indexes
             .iter()
             .any(|&index| self.tabs[index].saving || self.tabs[index].recovering)
@@ -151,6 +157,7 @@ impl App {
         for &index in &indexes {
             self.tabs[index].sync_document();
             if self.tabs[index].document.dirty
+                && !self.view_survives(index, &closing_ids)
                 && let Err(error) = recovery::remove(&self.tabs[index].recovery_key)
             {
                 self.notice = Some(format!("Could not remove recovery draft: {error}"));

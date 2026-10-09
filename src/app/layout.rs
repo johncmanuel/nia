@@ -28,6 +28,12 @@ impl App {
 
     pub(super) fn remove_tab(&mut self, index: usize) {
         let id = self.tabs[index].id;
+        let primary = self.primary_view(index) == index;
+        let shared = self.tabs[index].document.path.as_ref().and_then(|path| {
+            self.tabs.iter().enumerate().find_map(|(other, tab)| {
+                (other != index && tab.document.path.as_ref() == Some(path)).then_some(other)
+            })
+        });
         let previous_group = self.active_group;
         let Some(owner) = self
             .groups
@@ -38,7 +44,16 @@ impl App {
         };
         self.select_group(owner);
         let closed = self.tabs.remove(index);
-        if let Err(error) = recovery::remove(&closed.recovery_key) {
+        if primary && let Some(other) = shared {
+            let other = if other > index { other - 1 } else { other };
+            let previous_key =
+                std::mem::replace(&mut self.tabs[other].recovery_key, closed.recovery_key);
+            self.tabs[other].recovered_revision = closed.recovered_revision;
+            self.tabs[other].last_recovery_failure = closed.last_recovery_failure;
+            if let Err(error) = recovery::remove(&previous_key) {
+                log::warn!("recovery cleanup failed: {:?}", error.kind());
+            }
+        } else if let Err(error) = recovery::remove(&closed.recovery_key) {
             log::warn!("recovery cleanup failed: {:?}", error.kind());
         }
         self.groups[self.active_group]

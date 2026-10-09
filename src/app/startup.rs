@@ -8,9 +8,11 @@ use std::path::PathBuf;
 
 pub(crate) fn boot() -> (App, Task<Message>) {
     let mut state = blank();
+    let mut restored_group = None;
     match session::load() {
         Ok(Some(saved)) => {
             session::restore(&mut state, saved);
+            restored_group = Some(state.active_group);
             log::info!("saved layout restored");
         }
         Err(error) => {
@@ -42,6 +44,9 @@ pub(crate) fn boot() -> (App, Task<Message>) {
             state.notice = Some("Could not read local recovery drafts.".into());
             log::warn!("recovery load failed: {:?}", error.kind());
         }
+    }
+    if let Some(group) = restored_group {
+        state.select_group(group);
     }
     let task = if let Some(path) = std::env::args_os().nth(1) {
         state.loading = true;

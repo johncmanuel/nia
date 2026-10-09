@@ -1,7 +1,10 @@
 use super::{App, GroupLayout, Tab, TabGroup};
 use crate::config;
 use crate::document::Document;
-use iced::widget::pane_grid::{self, Axis, Configuration, Node};
+use iced::widget::{
+    markdown,
+    pane_grid::{self, Axis, Configuration, Node},
+};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, ErrorKind};
@@ -9,6 +12,7 @@ use std::path::{Path, PathBuf};
 
 pub(super) struct Session {
     paths: Vec<Option<PathBuf>>,
+    reading: Vec<bool>,
     active_group: usize,
     groups: Vec<SavedGroup>,
 }
@@ -29,7 +33,7 @@ pub(super) fn load() -> io::Result<Option<Session>> {
 }
 
 pub(super) fn save_to(app: &App, path: &Path) -> io::Result<()> {
-    let mut text = format!("nia-layout-2\n{}\n{}\n", app.tabs.len(), app.active_group);
+    let mut text = format!("nia-layout-3\n{}\n{}\n", app.tabs.len(), app.active_group);
     for tab in &app.tabs {
         match &tab.document.path {
             Some(path) => {
@@ -40,6 +44,9 @@ pub(super) fn save_to(app: &App, path: &Path) -> io::Result<()> {
             }
             None => text.push_str("-\n"),
         }
+    }
+    for tab in &app.tabs {
+        text.push_str(if tab.reading.is_some() { "R\n" } else { "W\n" });
     }
     writeln!(text, "{}", app.groups.len()).map_err(io::Error::other)?;
     for (index, group) in app.groups.iter().enumerate() {
@@ -108,7 +115,7 @@ pub(super) fn load_from(path: &Path) -> io::Result<Option<Session>> {
 pub(super) fn decode(text: &str) -> Option<Session> {
     let mut lines = text.lines();
     let version = lines.next()?;
-    if !matches!(version, "nia-layout-1" | "nia-layout-2") {
+    if !matches!(version, "nia-layout-1" | "nia-layout-2" | "nia-layout-3") {
         return None;
     }
     let count: usize = lines.next()?.parse().ok()?;
@@ -133,6 +140,17 @@ pub(super) fn decode(text: &str) -> Option<Session> {
             .collect::<Option<_>>()?;
         paths.push(Some(PathBuf::from(String::from_utf8(decoded).ok()?)));
     }
+    let reading = if version == "nia-layout-3" {
+        (0..count)
+            .map(|_| match lines.next()? {
+                "R" => Some(true),
+                "W" => Some(false),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()?
+    } else {
+        vec![false; count]
+    };
     let (active_group, groups) = if version == "nia-layout-1" {
         if selection >= count {
             return None;
@@ -198,6 +216,7 @@ pub(super) fn decode(text: &str) -> Option<Session> {
     }
     Some(Session {
         paths,
+        reading,
         active_group,
         groups,
     })
@@ -243,8 +262,9 @@ pub(super) fn restore(app: &mut App, session: Session) {
     app.tabs = session
         .paths
         .into_iter()
+        .zip(session.reading)
         .enumerate()
-        .map(|(index, path)| {
+        .map(|(index, (path, reading))| {
             let document = match path {
                 Some(path) => match Document::open(path) {
                     Ok(document) => document,
@@ -256,7 +276,11 @@ pub(super) fn restore(app: &mut App, session: Session) {
                 },
                 None => Document::new(),
             };
-            Tab::new(index as u64, document)
+            let mut tab = Tab::new(index as u64, document);
+            if reading {
+                tab.reading = Some(markdown::Content::parse(&tab.document.contents));
+            }
+            tab
         })
         .collect();
     app.next_id = app.tabs.len() as u64;

@@ -48,6 +48,13 @@ pub(crate) fn update(state: &mut Desktop, message: Message) -> Task<Message> {
                     | app::Message::Saved(.., Ok(()))
                     | app::Message::SelectTab(_)
                     | app::Message::SelectGroup(_)
+                    | app::Message::ToggleReading
+                    | app::Message::ShowEditor
+                    | app::Message::ShowSearch
+                    | app::Message::ShowTabSearch
+                    | app::Message::JumpOutline(_)
+                    | app::Message::JumpTabSearch(_)
+                    | app::Message::Format(_)
                     | app::Message::NextPane
                     | app::Message::PreviousPane
                     | app::Message::ActivatePane(_)

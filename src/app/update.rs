@@ -218,7 +218,7 @@ pub(crate) fn update(state: &mut App, message: Message) -> Task<Message> {
         Message::KeyPressed(key, modifiers) => return keyboard::handle(state, key, modifiers),
         message @ (Message::ToggleZen
         | Message::SetHighlightLine(_)
-        | Message::SetDimming(_)
+        | Message::SetInactivePaneDim(_)
         | Message::RecordShortcut(_)
         | Message::ResetKeybindings
         | Message::SetTheme(_)

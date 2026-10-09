@@ -17,6 +17,10 @@ fn layout_shortcuts_work_without_a_layout_button() {
         let _ = update(&mut app, message);
     }
     assert_eq!(app.panes.len(), 2);
+    let mut ui = simulator(crate::ui::view(&app));
+    assert!(ui.find("\u{25CF}").is_err());
+    assert!(ui.find("\u{25CB}").is_err());
+    drop(ui);
     if let Ok(path) = std::env::var("NIA_LAYOUT_SNAPSHOT") {
         if std::env::var("NIA_LAYOUT_SNAPSHOT_THEME").as_deref() == Ok("light") {
             app.theme = iced::Theme::Light;

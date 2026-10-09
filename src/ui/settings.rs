@@ -1,10 +1,9 @@
 use super::{footer_button, muted_text, theme};
 use crate::app::{App, Message};
-use crate::focus::Dimming;
 use crate::keybindings::Slot;
 use iced::theme::Base;
 use iced::widget::{
-    button, checkbox, column, combo_box, container, pick_list, row, scrollable, slider, space, text,
+    button, checkbox, column, combo_box, container, row, scrollable, slider, space, text,
 };
 use iced::{Element, Length};
 
@@ -94,14 +93,12 @@ pub(super) fn settings_page(state: &App) -> Element<'_, Message> {
                 .label("Highlight current line")
                 .on_toggle(Message::SetHighlightLine),
         )
-        .push(
-            row![
-                text("Dim unfocused"),
-                pick_list(Dimming::ALL, Some(state.focus.dimming), Message::SetDimming),
-            ]
-            .spacing(8)
-            .align_y(iced::Alignment::Center),
-        )
+        .push(text(format!("Inactive split dimming: {}%", state.focus.inactive_pane_dim)).size(14))
+        .push(slider(
+            0..=100,
+            state.focus.inactive_pane_dim,
+            Message::SetInactivePaneDim,
+        ))
         .push(text("Keybindings").size(18))
         .push(
         text("Click a shortcut, then press Command or Control with a letter, number, bracket, Tab, plus, minus, or comma. Escape cancels.")

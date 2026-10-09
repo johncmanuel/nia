@@ -2,7 +2,8 @@ use crate::app::{App, EDITOR, Message, RECENT, Tab};
 use crate::markdown::{self, HighlightSettings, MarkdownHighlighter};
 use crate::ui::reading::reading_view;
 use iced::widget::{
-    button, column, container, pane_grid, row, scrollable, space, text, text_editor, text_input,
+    Stack, button, column, container, pane_grid, row, scrollable, space, text, text_editor,
+    text_input,
 };
 use iced::{Background, Border, Element, Length, Theme};
 
@@ -10,9 +11,6 @@ pub(super) fn editor_view<'a>(state: &'a App, tab: &'a Tab, active: bool) -> Ele
     let line = tab.editor.cursor().position.line;
     let highlight = HighlightSettings {
         active_line: active.then_some(line),
-        focus: active
-            .then(|| crate::focus::active_span(&tab.editor, state.focus.dimming))
-            .flatten(),
         highlight_line: active && state.focus.highlight_line,
     };
     let mut editor = text_editor(&tab.editor)
@@ -129,17 +127,53 @@ pub(super) fn panes_view(state: &App) -> Element<'_, Message> {
             .find(|tab| tab.id == *tab_id)
             .unwrap_or_else(|| state.current());
         let active = pane == state.active_pane;
+        let dim = f32::from(state.focus.inactive_pane_dim) / 100.0;
+        let inactive_text_alpha = (1.0 - dim).max(0.25);
         let title = row![
-            text(if active { "\u{25CF}" } else { "\u{25CB}" }).size(12),
-            text(tab.document.file_name()).size(13),
+            text(tab.document.file_name())
+                .size(13)
+                .style(move |theme: &Theme| text::Style {
+                    color: Some(theme.palette().text.scale_alpha(if active {
+                        1.0
+                    } else {
+                        inactive_text_alpha
+                    })),
+                }),
             space::horizontal(),
             button("\u{00D7}")
-                .style(button::text)
+                .style(move |theme: &Theme, status| {
+                    let mut style = button::text(theme, status);
+                    if !active && status == button::Status::Active {
+                        style.text_color = theme.palette().text.scale_alpha(inactive_text_alpha);
+                    }
+                    style
+                })
                 .on_press(Message::ClosePane(pane)),
         ]
         .spacing(8)
         .align_y(iced::Alignment::Center);
-        let content = pane_grid::Content::new(editor_view(state, tab, active));
+        let editor = editor_view(state, tab, active);
+        let body: Element<'_, Message> = if active || dim == 0.0 {
+            editor
+        } else {
+            Stack::new()
+                .push(editor)
+                .push(
+                    container(space::horizontal())
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .style(move |theme: &Theme| {
+                            let mut color = theme.palette().background;
+                            color.a = dim;
+                            container::Style::default().background(color)
+                        }),
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .clip(true)
+                .into()
+        };
+        let content = pane_grid::Content::new(body);
         if state.panes.len() > 1 {
             content
                 .title_bar(pane_grid::TitleBar::new(title).padding([8, 12]))

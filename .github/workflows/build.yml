@@ -186,4 +186,8 @@ jobs:
             options=(--target "$GITHUB_SHA" --prerelease --latest=false --title "nia preview ${GITHUB_SHA::7}")
           fi
           gh release create "$release_tag" dist/* --draft --generate-notes "${options[@]}"
-          gh release edit "$release_tag" --draft=false
+          if [[ $GITHUB_REF == refs/heads/master ]]; then
+            gh release edit "$release_tag" --draft=false
+          else
+            gh release edit "$release_tag" --draft=false --latest
+          fi

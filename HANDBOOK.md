@@ -25,7 +25,7 @@ Press Ctrl+Shift+L to show one pane in the current group. Press Primary+D to add
 
 Select a pane to work in its document. Press Primary+N to make a new document group. Opening a different file makes a group when another document is open. To show the same file in two panes, open it again. If the active pane is empty, nia puts the file in that pane. If it is not empty, nia adds a pane on the right. Changes in one pane appear in the other pane.
 
-Drag a pane by its title bar to move it. Drag the line between panes to change their sizes. Select the close button on a pane to hide that pane. This action keeps its document open. nia restores the groups, open documents, and pane layouts when you start it again.
+Drag a pane by its title bar to move it. Drag the line between panes to change their sizes. Select the close button on a pane to hide that pane. This action keeps its document open. nia restores the groups, open documents, pane layouts, and last selected group when you start it again.
 
 ## Write and read Markdown
 
@@ -39,7 +39,7 @@ Press Primary+Z to undo. Press Primary+Shift+Z to redo. nia groups nearby letter
 
 Read mode shows common Markdown forms. Some extended forms, such as definition lists, emoji codes, highlights, subscripts, and superscripts, stay as source text in Read mode.
 
-Select **Read** to see formatted text. Select **Write** to return to the same text and cursor position.
+Select **Read** to see formatted text. Select **Write** to return to the same text and cursor position. nia keeps each open tab in its selected Read or Write mode when you start it again.
 
 To add an image, type its Markdown link, for example `![Chart](images/chart.png)`. The link stays visible while you write. Select **Read** to see a local image. Save a new document before you use a relative image path. nia finds a relative image path from the document's folder. It does not load images from the Internet. In Read mode, select a link to copy its address.
 
@@ -61,7 +61,7 @@ On macOS and Linux, select **Transparent background** to see the desktop through
 
 Press Primary+Shift+J or select **Zen mode** in Settings to hide the footer and tab bar. Open panes, the outline, and search stay visible. Press Escape to show the controls again.
 
-In Settings, select **Highlight current line** to show the active line with a different color. Select **Dim unfocused** to make other paragraphs or sentences dim.
+In Settings, select **Highlight current line** to show the active line with a different color. In a split layout, inactive panes appear dim so you can find the active pane. Adjust **Inactive split dimming** to change this effect. Set it to 0% to turn it off.
 
 ## Use keyboard shortcuts
 

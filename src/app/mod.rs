@@ -146,7 +146,6 @@ pub(crate) enum Message {
     ShowEditor,
     ToggleZen,
     SetHighlightLine(bool),
-    SetInactivePaneDim(u8),
     ToggleReading,
     CopyLink(String),
     RecordShortcut(Slot),

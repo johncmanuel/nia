@@ -12,6 +12,7 @@
 
 ## Editor improvements
 
+- [ ] Add TeX math inside Markdown: preserve `$...$` and `$$...$$` in Writing mode, then render them offline in Read mode without changing the saved source.
 - [ ] Render extended Markdown forms that Iced's current Markdown viewer leaves as source text: footnotes, definition lists, emoji codes, highlights, subscripts, and superscripts.
 - [ ] Evaluate a faster text storage strategy using the plan below. Do not replace the editor's text representation before measurements identify a bottleneck.
 - [ ] Evaluate cross-process locking or an atomic conflict check for saving an open file. A file can change between the current comparison and rename.
@@ -19,6 +20,14 @@
 Writing mode keeps Markdown syntax visible. Read mode uses Iced's Markdown renderer and a custom image viewer.
 
 Synchronization from the design document remains deferred until requested.
+
+## Math in Markdown plan
+
+1. Define the supported delimiters and edge cases: inline `$...$`, display `$$...$$`, escaped dollar signs, code spans and fences, invalid formulas, and long equations. Keep Markdown source visible and editable in Writing mode.
+2. Prototype an offline math renderer that produces image bytes for Iced. Check formula coverage, theme colors, font scaling, cross-platform builds, and render cost before adding a dependency. Cache by formula, display style, theme, and font size.
+3. Add display equations to Read mode first while keeping the existing Iced Markdown viewer for surrounding content. Iced 0.14's Markdown parser does not expose math items, so detect math with a parser that supports math events instead of a dollar-sign regex.
+4. Add inline equations after validating how they wrap with surrounding rich text. The current Iced Markdown viewer cannot place image widgets inside its text spans; this needs a paragraph-level rendering path.
+5. Add `iced_test` coverage for source preservation, rendering, failed formulas, escaped delimiters, code fences, theme and font changes, and shared document views.
 
 ## Text storage evaluation plan
 

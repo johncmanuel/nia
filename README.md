@@ -4,6 +4,19 @@ A small native Markdown editor built with Rust and Iced. It supports tab groups 
 
 Run `cargo run` for a blank document or `cargo run -- path/to/article.md` to open a Markdown file. The [Handbook](HANDBOOK.md) explains how to use the editor. It is also available offline through the **Handbook** button in the app.
 
+## Install from source
+
+To run `nia` from any directory, install the binary from this repository:
+
+```sh
+cargo install --path . --locked --no-default-features
+nia ./document.md
+```
+
+Cargo normally installs `nia` in `~/.cargo/bin`. If your shell cannot find it, add that directory to your `PATH`. On macOS with zsh, add `export PATH="$HOME/.cargo/bin:$PATH"` to `~/.zshrc` and open a new terminal. Run `cargo install --path . --locked --no-default-features` again after source changes to update the installed command.
+
+To remove the Cargo-installed command later, run `cargo uninstall nia`.
+
 ## Development
 
 `cargo test` runs headless `iced_test` interaction and rendering checks. Run `cargo run` and press F12 to view Iced's debug metrics. Use `NIA_LOG=debug cargo run` to see more diagnostic events on standard error. Production builds use `cargo build --release --no-default-features` to omit the debugger.

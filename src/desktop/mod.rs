@@ -1,6 +1,6 @@
 use crate::{app, ui};
 use iced::keyboard::{self, Key, key::Named};
-use iced::widget::text;
+use iced::widget::{operation, text};
 use iced::{Element, Subscription, Task, Theme, event, window};
 use std::time::{Duration, Instant};
 
@@ -85,7 +85,10 @@ pub(crate) fn update(state: &mut Desktop, message: Message) -> Task<Message> {
             let startup = state.startup.take().map_or_else(Task::none, |task| {
                 task.map(move |message| Message::Window(id, message))
             });
-            Task::batch([window::gain_focus(id), startup])
+            Task::batch([
+                window::gain_focus(id).chain(operation::focus(app::EDITOR)),
+                startup,
+            ])
         }
         Message::WindowClosed(id) if id == state.window => {
             log::info!("window closed");
